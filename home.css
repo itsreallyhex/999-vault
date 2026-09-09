@@ -1,0 +1,392 @@
+/* ============================================================
+   Landing page.
+
+   Layered on top of style.css, which supplies the tokens, reset,
+   fonts and cover system. Everything here is prefixed `home-` so it
+   cannot collide with the Vault's own classes.
+
+   Structure is full-bleed bands. Each section spans the viewport and
+   centres its content with `.home-in`, so a band can carry its own
+   ground colour or rule without the page turning into one column of
+   evenly spaced boxes.
+   ============================================================ */
+
+:root {
+  /* Width of the centred content column. style.css reads it as --shell
+     for the shared nav, so both bars line up with the page. */
+  --home-max: 1240px;
+  --shell: 1240px;
+}
+
+.home-in {
+  max-width: var(--home-max);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+/* Anchored sections clear the sticky nav */
+.home-band, .home-close { scroll-margin-top: calc(var(--nav-h) + 1rem); }
+
+/* ============================================================
+   HERO
+   ============================================================ */
+.home-hero { position: relative; overflow: hidden; }
+
+/* One soft light source behind the type, so the top of the page is not
+   a flat rectangle of near black. */
+.home-hero::before {
+  content: ''; position: absolute; inset: -30% 0 auto -20%;
+  height: 80%; pointer-events: none; z-index: 0;
+  background: radial-gradient(55% 60% at 25% 40%, rgba(139, 92, 246, 0.20), transparent 70%);
+}
+
+.home-hero-in {
+  position: relative; z-index: 1;
+  max-width: var(--home-max); margin-inline: auto;
+  padding: clamp(2.5rem, 1.5rem + 4vw, 5.5rem) var(--gutter) clamp(2rem, 1.5rem + 2vw, 3.5rem);
+  display: grid; gap: clamp(2rem, 1rem + 4vw, 3rem);
+}
+@media (min-width: 940px) {
+  .home-hero-in {
+    grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr);
+    align-items: center;
+    /* The mosaic is allowed to run off the right edge; the hero clips it. */
+    padding-right: 0;
+  }
+}
+
+.home-eyebrow { display: flex; align-items: center; gap: 0.6rem; color: var(--dim); }
+.home-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex: none;
+  background: var(--accent-2); box-shadow: 0 0 0 4px rgba(196, 181, 253, 0.14);
+}
+
+.home-title { display: grid; gap: 0.35rem; margin: 1rem 0 0; }
+.home-title-mark {
+  font-family: 'Righteous', sans-serif;
+  font-size: clamp(4.5rem, 1rem + 15vw, 10.5rem);
+  line-height: 0.82; letter-spacing: -0.02em;
+  background: linear-gradient(160deg, #FFFFFF 18%, var(--accent-2) 62%, var(--accent) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.home-title-rest {
+  font-family: 'Righteous', sans-serif;
+  font-size: clamp(1.4rem, 0.9rem + 2.1vw, 2.5rem);
+  line-height: 1.08; color: var(--text);
+  max-width: 16ch;
+}
+
+.home-lede {
+  margin-top: 1.25rem;
+  font-size: clamp(1rem, 0.94rem + 0.45vw, 1.2rem);
+  color: var(--dim); max-width: 52ch; line-height: 1.7;
+}
+
+.home-cta {
+  display: flex; flex-wrap: wrap; gap: 0.75rem;
+  margin-top: clamp(1.5rem, 1.2rem + 1vw, 2.25rem);
+}
+
+/* Live / offline / loading indicator, mirroring the Vault's header */
+.home-hero-note {
+  display: inline-flex; align-items: center; gap: 0.55rem;
+  margin-top: 1.4rem;
+  font-family: 'JetBrains Mono', monospace; font-size: var(--step--2);
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint);
+}
+.home-hero-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex: none;
+  background: var(--faint);
+  transition: background-color var(--dur) var(--ease);
+}
+.home-hero-note[data-state="live"] .home-hero-dot { background: var(--c-released); }
+.home-hero-note[data-state="offline"] .home-hero-dot { background: var(--c-stem); }
+.home-hero-note[data-state="loading"] .home-hero-dot { animation: home-pulse 1.5s var(--ease) infinite; }
+
+@keyframes home-pulse { 50% { opacity: 0.25; } }
+
+/* ---------- Cover mosaic ---------- */
+/* Three columns of real artwork, tilted and running past the right edge.
+   Purely decorative, and it holds its own height so the hero does not
+   reflow when the covers arrive. */
+.home-mosaic {
+  display: none;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  transform: rotate(-7deg) scale(1.18);
+  transform-origin: 40% 50%;
+  /* Fade every edge so the grid dissolves into the page instead of
+     ending on a hard rectangle. */
+  -webkit-mask-image: radial-gradient(70% 62% at 45% 50%, #000 35%, transparent 78%);
+  mask-image: radial-gradient(70% 62% at 45% 50%, #000 35%, transparent 78%);
+  pointer-events: none;
+}
+@media (min-width: 940px) { .home-mosaic { display: grid; } }
+
+.home-mosaic-col { display: grid; gap: 0.75rem; }
+.home-mosaic-col:nth-child(1) { animation: home-float-up 19s ease-in-out infinite; }
+.home-mosaic-col:nth-child(2) { animation: home-float-down 23s ease-in-out infinite; }
+.home-mosaic-col:nth-child(3) { animation: home-float-up 21s ease-in-out infinite 1.5s; }
+
+@keyframes home-float-up   { 0%, 100% { transform: translateY(1.4%); }  50% { transform: translateY(-1.4%); } }
+@keyframes home-float-down { 0%, 100% { transform: translateY(-1.4%); } 50% { transform: translateY(1.4%); } }
+
+.home-mosaic-cell {
+  container-type: inline-size;
+  border-radius: var(--r);
+  overflow: hidden;
+  /* Held before the artwork loads so the tilted grid has its full
+     height from the first paint. */
+  aspect-ratio: 1 / 1;
+  background: var(--bg-2);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
+/* ---------- Full-bleed drifting strip ---------- */
+/* .hero-strip, .strip-track and .strip-tile all come from style.css. */
+.home-strip {
+  position: relative; z-index: 1;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-2);
+  padding-block: clamp(0.6rem, 0.4rem + 1vw, 1.1rem);
+}
+
+/* ============================================================
+   FIGURES
+   ============================================================ */
+.home-stats { border-bottom: 1px solid var(--line); }
+.home-stats-in {
+  max-width: var(--home-max); margin-inline: auto;
+  padding: clamp(1.5rem, 1.2rem + 1.5vw, 2.4rem) var(--gutter);
+  display: grid; gap: 1.4rem 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 700px) { .home-stats-in { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+
+.home-stat dd {
+  margin: 0;
+  font-size: clamp(1.75rem, 1.3rem + 1.8vw, 2.75rem);
+  line-height: 1; font-weight: 500; color: var(--text);
+}
+.home-stat dt { margin-top: 0.5rem; }
+
+/* The point of the whole project, so it reads as a claim rather than
+   as a count that happens to be zero. */
+.home-stat-zero dd { color: var(--c-released); }
+
+/* ============================================================
+   BANDS
+   ============================================================ */
+.home-band { padding-block: clamp(3rem, 2rem + 4vw, 6rem); }
+.home-band-line { border-top: 1px solid var(--line); }
+
+.home-head { max-width: 46ch; margin-bottom: clamp(1.75rem, 1.3rem + 2vw, 2.75rem); }
+.home-head h2, .home-split-head h2, .home-close-title {
+  font-family: 'Righteous', sans-serif; font-weight: 400;
+  font-size: clamp(1.75rem, 1.3rem + 2vw, 2.8rem);
+  line-height: 1.08; margin: 0.6rem 0 0;
+}
+.home-head-note { margin-top: 0.9rem; color: var(--dim); line-height: 1.7; }
+
+/* Label column beside the prose, so the sections stop reading as one
+   stack of identical text blocks. */
+.home-split { display: grid; gap: clamp(1.5rem, 1rem + 2vw, 2.5rem); }
+@media (min-width: 940px) {
+  .home-split { grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: 4rem; }
+  .home-split-head { position: sticky; top: calc(var(--nav-h) + 2rem); align-self: start; }
+}
+.home-prose { color: var(--dim); max-width: 66ch; line-height: 1.75; }
+.home-prose + .home-prose { margin-top: 0.9rem; }
+
+/* ============================================================
+   THE TWO PAGES
+   ============================================================ */
+.home-pages { display: grid; gap: clamp(0.9rem, 0.6rem + 1.2vw, 1.4rem); }
+@media (min-width: 820px) { .home-pages { grid-template-columns: 1fr 1fr; } }
+
+.home-card {
+  display: flex; flex-direction: column;
+  background: var(--bg-2); border: 1px solid var(--line);
+  border-radius: var(--r-lg); overflow: hidden;
+  text-decoration: none; color: inherit; cursor: pointer;
+  position: relative;
+  transition: border-color var(--dur) var(--ease), background-color var(--dur) var(--ease);
+}
+.home-card:hover, .home-card:focus-visible {
+  border-color: var(--tint, var(--accent));
+  background: var(--bg-3);
+}
+
+/* Artwork banner across the top of each card */
+.home-card-art {
+  position: relative;
+  aspect-ratio: 16 / 7;
+  background: var(--bg-3);
+  border-bottom: 1px solid var(--line);
+  display: flex; gap: 2px; overflow: hidden;
+}
+.home-card-art::after {
+  content: ''; position: absolute; inset: 0; z-index: 2;
+  background:
+    linear-gradient(180deg, transparent 35%, rgba(16, 14, 23, 0.9)),
+    radial-gradient(120% 130% at 50% 0%, var(--tint, var(--accent)) 0%, transparent 60%);
+  opacity: 0.55;
+  transition: opacity var(--dur) var(--ease);
+}
+.home-card:hover .home-card-art::after { opacity: 0.35; }
+
+.home-card-art .home-card-cell {
+  flex: 1 1 0; min-width: 0; container-type: inline-size;
+}
+
+/* The tribute card has no catalogue artwork to show, so it carries the mark */
+.home-card-art-999 {
+  align-items: center; justify-content: center;
+  background:
+    radial-gradient(90% 120% at 50% 0%, rgba(134, 239, 172, 0.16), transparent 65%),
+    var(--bg-3);
+}
+.home-card-art-999 span {
+  position: relative; z-index: 3;
+  font-family: 'Righteous', sans-serif;
+  font-size: clamp(3rem, 2rem + 5vw, 5rem); line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 1.5px var(--c-released);
+  opacity: 0.5;
+  transition: opacity var(--dur) var(--ease);
+}
+.home-card-art-999::after { opacity: 0.2; }
+.home-card:hover .home-card-art-999 span { opacity: 0.85; }
+
+.home-card-body {
+  display: flex; flex-direction: column; gap: 0.95rem;
+  padding: clamp(1.3rem, 1rem + 1.4vw, 2rem);
+  flex: 1;
+}
+.home-card-eyebrow { color: var(--tint, var(--accent)); }
+.home-card h3 {
+  font-family: 'Righteous', sans-serif; font-weight: 400;
+  font-size: clamp(1.7rem, 1.35rem + 1.5vw, 2.4rem); line-height: 1;
+}
+.home-card p { color: var(--dim); line-height: 1.7; }
+
+.home-tags {
+  display: flex; flex-wrap: wrap; gap: 0.45rem;
+  margin-top: auto; padding-top: 0.4rem;
+}
+.home-tags li {
+  font-family: 'JetBrains Mono', monospace; font-size: var(--step--2);
+  letter-spacing: 0.06em; color: var(--dim);
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--line-2); border-radius: 999px;
+}
+
+.home-go {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  font-weight: 600; font-size: var(--step-0);
+  color: var(--tint, var(--accent));
+}
+.home-go svg { width: 16px; height: 16px; transition: transform var(--dur) var(--ease); }
+.home-card:hover .home-go svg { transform: translateX(4px); }
+
+/* ============================================================
+   SECTION CONTENT
+   ============================================================ */
+.home-grid {
+  display: grid; gap: 0.9rem; margin-top: 1.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+}
+.home-item {
+  padding: 1.15rem 1.25rem;
+  border: 1px solid var(--line); border-radius: var(--r);
+  background: var(--bg-2);
+}
+/* h3, not h4: these sit directly under the band's h2, and skipping a
+   level breaks the document outline for a screen reader. */
+.home-item h3 {
+  font-family: 'Poppins', system-ui, sans-serif;
+  font-size: var(--step-0); font-weight: 600; line-height: 1.4;
+  margin: 0 0 0.4rem;
+}
+.home-item p { color: var(--faint); font-size: var(--step--1); line-height: 1.65; margin: 0; }
+
+/* A short labelled list, used for the "what is and isn't included" pairs */
+.home-list { display: grid; gap: 0.6rem; margin-top: 1.5rem; }
+.home-list li {
+  display: flex; gap: 0.7rem; align-items: flex-start;
+  color: var(--dim); font-size: var(--step-0); line-height: 1.65;
+}
+.home-list svg { width: 18px; height: 18px; flex: none; margin-top: 0.25rem; }
+.home-list .yes { color: #34D399; }
+.home-list .no { color: #FB7185; }
+
+/* ---------- Sample of the generated covers ---------- */
+.home-swatch-cap { display: block; margin-top: 2rem; }
+.home-swatches {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 0.7rem; margin-top: 0.9rem;
+}
+@media (min-width: 560px) { .home-swatches { grid-template-columns: repeat(4, 1fr); } }
+.home-swatch { container-type: inline-size; }
+
+/* ============================================================
+   CLOSING CTA
+   ============================================================ */
+.home-close {
+  position: relative; overflow: hidden;
+  border-top: 1px solid var(--line);
+  padding-block: clamp(3.5rem, 2.5rem + 5vw, 7rem);
+  text-align: center;
+}
+.home-close::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(60% 100% at 50% 100%, rgba(139, 92, 246, 0.22), transparent 70%);
+}
+.home-close > * { position: relative; z-index: 1; }
+.home-close-title { max-width: 20ch; margin-inline: auto; }
+.home-close-note {
+  margin: 1rem auto 0; max-width: 52ch;
+  color: var(--dim); line-height: 1.7;
+}
+.home-close .home-cta { justify-content: center; }
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+.home-foot { border-top: 1px solid var(--line); background: var(--bg-2); }
+.home-foot-in {
+  padding-block: clamp(2.25rem, 1.75rem + 2vw, 3.5rem);
+  display: grid; gap: 2.25rem;
+}
+@media (min-width: 820px) {
+  .home-foot-in { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 4rem; }
+}
+.home-foot-brand { display: grid; gap: 0.85rem; justify-items: start; }
+.home-foot-brand p { color: var(--faint); font-size: var(--step--1); line-height: 1.7; max-width: 58ch; }
+
+.home-foot-nav { display: flex; flex-wrap: wrap; gap: 2rem 3rem; }
+.home-foot-nav ul { display: grid; gap: 0.5rem; margin-top: 0.85rem; }
+.home-foot-nav a {
+  color: var(--dim); text-decoration: none; font-size: var(--step-0);
+  transition: color var(--dur) var(--ease);
+}
+.home-foot-nav a:hover { color: var(--accent-2); }
+
+/* ============================================================
+   NARROW SCREENS
+   ============================================================ */
+@media (max-width: 600px) {
+  .home-title { gap: 0.5rem; }
+  .home-title-rest { max-width: none; }
+  .home-cta { gap: 0.6rem; }
+  .home-cta .btn-lg { flex: 1 1 100%; }
+  .home-card-art { aspect-ratio: 16 / 9; }
+  .home-tags li { font-size: 0.62rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-mosaic-col { animation: none; }
+  .home-hero-note[data-state="loading"] .home-hero-dot { animation: none; }
+  .home-card:hover .home-go svg { transform: none; }
+}

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="The Vault: a visual index of the Juice WRLD archive. Covers, alternate titles, categories and durations. Interface study, no audio.">
+  <meta name="theme-color" content="#08070C">
+  <title>The Vault: Juice WRLD Archive</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a class="skip-link" href="#grid">Skip to the archive</a>
+
+  <!-- ==================== NAV ==================== -->
+  <nav class="site-nav" aria-label="Primary">
+    <div class="site-nav-in">
+      <a class="brand" href="index.html" aria-label="999, home">
+        <span class="brand-mark" aria-hidden="true">999</span>
+        <span class="brand-text">A Juice WRLD fan project</span>
+      </a>
+
+      <ul class="site-nav-links">
+        <li><a href="vault.html" aria-current="page">The Vault</a></li>
+        <li><a href="tribute/index.html">Tribute</a></li>
+        <li><a href="index.html#data">About the data</a></li>
+      </ul>
+
+      <a class="btn btn-ghost" href="tribute/index.html">Read the tribute</a>
+    </div>
+  </nav>
+
+  <!-- ==================== HERO ==================== -->
+  <header class="hero wrap">
+    <div class="hero-bento">
+      <section class="hero-card">
+        <div>
+          <p class="label">Unofficial fan archive &middot; interface study</p>
+          <h1 class="hero-title">The Vault</h1>
+          <p class="hero-lede">
+            Every version, every alternate title, every session edit. The catalogue
+            of what exists, laid out so you can actually find something in it.
+          </p>
+        </div>
+
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#search">
+            Search the archive
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+          <a class="btn btn-ghost" href="index.html#covers">How the covers work</a>
+        </div>
+
+        <p class="source" id="source"><span class="src-dot" aria-hidden="true"></span><span id="sourceText">Connecting to the archive</span></p>
+      </section>
+
+      <dl class="hero-figs" id="heroFigs"></dl>
+    </div>
+  </header>
+
+  <!-- Full-bleed drifting strip of covers; decorative, so hidden from AT -->
+  <div class="hero-strip" aria-hidden="true">
+    <div class="strip-track" id="stripTrack"></div>
+  </div>
+
+  <!-- ==================== CONTROLS ==================== -->
+  <section class="controls" aria-label="Search and filter">
+    <div class="controls-inner wrap">
+      <div class="search-row" id="searchRow">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
+        </svg>
+        <label class="sr-only" for="search">Search titles and alternate names</label>
+        <input class="search" id="search" type="search" autocomplete="off" spellcheck="false"
+               placeholder="Search titles and alternate names">
+        <button class="search-clear" id="searchClear" type="button">
+          <span class="sr-only">Clear search</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="bar">
+        <div class="chips" id="chips" role="group" aria-label="Filter by category"></div>
+        <p class="count" id="count" role="status" aria-live="polite"></p>
+        <label class="sr-only" for="sortSelect">Sort</label>
+        <select class="select" id="sortSelect">
+          <option value="plays-desc">Most played</option>
+          <option value="title-asc">Title A to Z</option>
+          <option value="title-desc">Title Z to A</option>
+          <option value="added-desc">Recently added</option>
+          <option value="length-desc">Longest</option>
+          <option value="length-asc">Shortest</option>
+        </select>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== GRID ==================== -->
+  <main class="grid-wrap wrap" id="grid">
+    <ul class="grid" id="rows"></ul>
+
+    <div class="empty" id="empty" hidden>
+      <h2>Nothing matches</h2>
+      <p>No entry in the archive fits that search and filter combination.</p>
+    </div>
+
+    <div class="more" id="more" hidden>
+      <button class="more-btn" id="moreBtn" type="button">Load more</button>
+      <p class="more-count label" id="moreCount"></p>
+    </div>
+
+    <div id="sentinel" aria-hidden="true"></div>
+  </main>
+
+  <footer class="foot">
+    <div class="foot-in wrap">
+      <div class="foot-brand">
+        <span class="brand-mark" aria-hidden="true">999</span>
+        <p>
+          An unofficial fan project, not affiliated with the estate of Jarad
+          Higgins, Grade A Productions or Interscope Records. Catalogue metadata
+          and cover images only, no audio anywhere. Cover images belong to their
+          respective owners and are shown here to identify recordings.
+        </p>
+      </div>
+
+      <nav class="foot-nav" aria-label="Footer">
+        <div>
+          <p class="label">Pages</p>
+          <ul>
+            <li><a href="index.html">About this project</a></li>
+            <li><a href="tribute/index.html">Tribute</a></li>
+          </ul>
+        </div>
+        <div>
+          <p class="label">The archive</p>
+          <ul>
+            <li><a href="index.html#data">Where the data comes from</a></li>
+            <li><a href="index.html#covers">How the covers work</a></li>
+          </ul>
+        </div>
+      </nav>
+    </div>
+  </footer>
+
+  <!-- ==================== LIGHTBOX ==================== -->
+  <div class="lightbox" id="lightbox" hidden>
+    <div class="lb-panel" role="dialog" aria-modal="true" aria-labelledby="lbTitle">
+      <button class="lb-close" id="lbClose" type="button">
+        <span class="sr-only">Close record</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <path d="M6 6l12 12M18 6L6 18"/>
+        </svg>
+      </button>
+
+      <div class="lb-art">
+        <div class="cover" id="lbCover">
+          <span class="cover-mark" id="lbMark" aria-hidden="true"></span>
+          <img class="cover-img" id="lbImg" alt="" decoding="async" hidden>
+        </div>
+      </div>
+
+      <div>
+        <p class="lb-cat" id="lbCat"><span class="dot" aria-hidden="true"></span><span id="lbCatName"></span></p>
+        <h2 class="lb-title" id="lbTitle"></h2>
+
+        <div class="lb-section">
+          <span class="label">Also circulates as</span>
+          <ul class="alt-list" id="lbAlts"></ul>
+          <p class="alt-empty" id="lbAltsEmpty" hidden>No alternate titles recorded.</p>
+        </div>
+
+        <div class="lb-section">
+          <span class="label">Record</span>
+          <dl class="dl" id="lbMeta"></dl>
+        </div>
+
+        <p class="lb-note">
+          Catalogue metadata only. This interface does not play, host or link to audio.
+          Covers are official artwork where a release exists, otherwise generated from the title.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

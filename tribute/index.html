@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A fan tribute to Juice WRLD (Jarad Anthony Higgins, 1998 to 2019). His five albums, a timeline of his career, and what 999 meant to him.">
+  <meta name="theme-color" content="#08050D">
+  <title>999: A Juice WRLD Tribute</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="grain" aria-hidden="true"></div>
+
+  <!-- ============ NAV ============ -->
+  <header>
+    <nav class="nav" id="nav" aria-label="Main">
+      <a class="brand" href="#top">
+        <span class="brand-mark" aria-hidden="true">999</span>
+        <span>Juice WRLD</span>
+      </a>
+
+      <div class="nav-links" id="navLinks">
+        <a href="#discography">Discography</a>
+        <a href="#timeline">Timeline</a>
+        <a href="#meaning">999</a>
+        <a href="#legacy">Legacy</a>
+        <a class="nav-vault" href="../vault.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+            <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+          </svg>
+          The Vault
+        </a>
+      </div>
+
+      <button class="nav-toggle" id="navToggle" type="button" aria-expanded="false" aria-controls="navDrawer">
+        <span class="sr-only">Open navigation menu</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <path d="M4 7h16M4 12h16M4 17h16"/>
+        </svg>
+      </button>
+    </nav>
+
+    <div class="nav-drawer" id="navDrawer" hidden>
+      <a href="#discography">Discography</a>
+      <a href="#timeline">Timeline</a>
+      <a href="#meaning">999</a>
+      <a href="#legacy">Legacy</a>
+      <a class="nav-vault" href="../vault.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+        The Vault
+      </a>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- ============ HERO ============ -->
+    <section class="hero" id="top">
+      <div class="hero-bg" aria-hidden="true"></div>
+      <div class="hero-999" aria-hidden="true">999</div>
+
+      <div class="wrap">
+        <p class="live-badge">
+          <span class="pulse" aria-hidden="true"></span>
+          Legends Never Die
+        </p>
+
+        <h1 class="hero-title">Juice&nbsp;WRLD</h1>
+
+        <p class="hero-dates">
+          <span>Jarad Anthony Higgins</span>
+          <span aria-hidden="true" class="dot"></span>
+          <span>Dec 2, 1998 to Dec 8, 2019</span>
+          <span aria-hidden="true" class="dot"></span>
+          <span>Chicago, Illinois</span>
+        </p>
+
+        <p class="hero-lede">
+          He made songs about anxiety, heartbreak and getting high that people
+          sang along to, and he recorded most of them without writing anything down.
+        </p>
+
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#discography">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.14v13.72a1 1 0 0 0 1.52.85l11.14-6.86a1 1 0 0 0 0-1.7L9.52 4.29A1 1 0 0 0 8 5.14Z"/></svg>
+            Explore the discography
+          </a>
+          <a class="btn btn-ghost" href="#meaning">
+            What 999 means
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ STATS ============ -->
+    <section class="section" style="padding-top:0" aria-label="At a glance">
+      <div class="wrap">
+        <dl class="stats reveal">
+          <div class="stat">
+            <dt>Studio albums</dt>
+            <dd>5</dd>
+          </div>
+          <div class="stat">
+            <dt>SoundCloud era began</dt>
+            <dd>2015</dd>
+          </div>
+          <div class="stat">
+            <dt>Longest freestyle</dt>
+            <dd>1 hour</dd>
+          </div>
+          <div class="stat">
+            <dt>Home city</dt>
+            <dd>Chicago</dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+
+    <!-- ============ DISCOGRAPHY (Portfolio Grid) ============ -->
+    <section class="section" id="discography">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <p class="eyebrow">Discography</p>
+          <h2>The five studio albums</h2>
+          <p>Two came out while he was alive. Three were released after he died. Pick one for details.</p>
+        </div>
+
+        <div class="filters reveal" role="group" aria-label="Filter albums by era">
+          <button class="filter" type="button" data-filter="all" aria-pressed="true">All</button>
+          <button class="filter" type="button" data-filter="lifetime" aria-pressed="false">Released in his lifetime</button>
+          <button class="filter" type="button" data-filter="posthumous" aria-pressed="false">Posthumous</button>
+        </div>
+
+        <div class="albums" id="albumGrid">
+          <button class="album reveal" type="button" data-album="ggr" data-era="lifetime">
+            <span class="cover cover-a">
+              <span class="cover-rings" aria-hidden="true"></span>
+              <span class="cover-num" aria-hidden="true">01</span>
+              <img class="cover-img" width="600" height="600" loading="lazy" decoding="async"
+                   src="https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/f8/6c/2a/f86c2ae0-b4eb-578c-1f02-3acb8409b815/21UMGIM53733.rgb.jpg/600x600bb.jpg"
+                   alt="Album cover: Goodbye &amp; Good Riddance by Juice WRLD">
+              <span class="cover-shade" aria-hidden="true"></span>
+            </span>
+            <span class="album-body">
+              <span class="album-year">2018</span>
+              <span class="album-title">Goodbye &amp; Good Riddance</span>
+              <span class="album-meta">Debut studio album &middot; May 23, 2018</span>
+              <span class="album-cta">
+                View details
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              </span>
+            </span>
+          </button>
+
+          <button class="album reveal" type="button" data-album="drfl" data-era="lifetime">
+            <span class="cover cover-b">
+              <span class="cover-rings" aria-hidden="true"></span>
+              <span class="cover-num" aria-hidden="true">02</span>
+              <img class="cover-img" width="600" height="600" loading="lazy" decoding="async"
+                   src="https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/62/10/cf/6210cf4a-be77-3d97-218d-834f68bb33b3/19UMGIM16006.rgb.jpg/600x600bb.jpg"
+                   alt="Album cover: Death Race for Love by Juice WRLD">
+              <span class="cover-shade" aria-hidden="true"></span>
+            </span>
+            <span class="album-body">
+              <span class="album-year">2019</span>
+              <span class="album-title">Death Race for Love</span>
+              <span class="album-meta">Second studio album &middot; No. 1 on the Billboard 200</span>
+              <span class="album-cta">
+                View details
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              </span>
+            </span>
+          </button>
+
+          <button class="album reveal" type="button" data-album="lnd" data-era="posthumous">
+            <span class="cover cover-c">
+              <span class="cover-rings" aria-hidden="true"></span>
+              <span class="cover-num" aria-hidden="true">03</span>
+              <img class="cover-img" width="600" height="600" loading="lazy" decoding="async"
+                   src="https://is1-ssl.mzstatic.com/image/thumb/Music114/v4/39/b1/1e/39b11eef-4709-bf53-2b5b-7954d2782496/20UMGIM58296.rgb.jpg/600x600bb.jpg"
+                   alt="Album cover: Legends Never Die by Juice WRLD">
+              <span class="cover-shade" aria-hidden="true"></span>
+            </span>
+            <span class="album-body">
+              <span class="album-year">2020</span>
+              <span class="album-title">Legends Never Die</span>
+              <span class="album-meta">First posthumous album &middot; No. 1 on the Billboard 200</span>
+              <span class="album-cta">
+                View details
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              </span>
+            </span>
+          </button>
+
+          <button class="album reveal" type="button" data-album="fd" data-era="posthumous">
+            <span class="cover cover-d">
+              <span class="cover-rings" aria-hidden="true"></span>
+              <span class="cover-num" aria-hidden="true">04</span>
+              <img class="cover-img" width="600" height="600" loading="lazy" decoding="async"
+                   src="https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/5a/18/b6/5a18b6f3-61cc-2ccc-3d59-874d3a7a2603/21UM1IM54284.rgb.jpg/600x600bb.jpg"
+                   alt="Album cover: Fighting Demons by Juice WRLD">
+              <span class="cover-shade" aria-hidden="true"></span>
+            </span>
+            <span class="album-body">
+              <span class="album-year">2021</span>
+              <span class="album-title">Fighting Demons</span>
+              <span class="album-meta">Second posthumous album &middot; Dec 10, 2021</span>
+              <span class="album-cta">
+                View details
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              </span>
+            </span>
+          </button>
+
+          <button class="album reveal" type="button" data-album="tpne" data-era="posthumous">
+            <span class="cover cover-e">
+              <span class="cover-rings" aria-hidden="true"></span>
+              <span class="cover-num" aria-hidden="true">05</span>
+              <img class="cover-img" width="600" height="600" loading="lazy" decoding="async"
+                   src="https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/f3/21/0d/f3210da8-5344-1e15-0838-65c5e61641f3/24UM1IM10948.rgb.jpg/600x600bb.jpg"
+                   alt="Album cover: The Party Never Ends by Juice WRLD">
+              <span class="cover-shade" aria-hidden="true"></span>
+            </span>
+            <span class="album-body">
+              <span class="album-year">2024</span>
+              <span class="album-title">The Party Never Ends</span>
+              <span class="album-meta">Third posthumous album &middot; Nov 29, 2024</span>
+              <span class="album-cta">
+                View details
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              </span>
+            </span>
+          </button>
+        </div>
+
+        <p id="filterStatus" class="sr-only" role="status" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <!-- ============ TIMELINE ============ -->
+    <section class="section" id="timeline">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <p class="eyebrow">Timeline</p>
+          <h2>The short version</h2>
+        </div>
+
+        <ol class="timeline" style="list-style:none;padding:0;margin:0">
+          <li class="tl-item reveal">
+            <p class="tl-year">1998</p>
+            <h3 class="tl-title">Born in Chicago</h3>
+            <p>Jarad Anthony Higgins was born on December 2 and grew up around Chicago. He played piano, drums and guitar as a kid.</p>
+          </li>
+          <li class="tl-item reveal">
+            <p class="tl-year">2015</p>
+            <h3 class="tl-title">JuicetheKidd on SoundCloud</h3>
+            <p>He started posting tracks to SoundCloud as JuicetheKidd, then shortened the name to Juice WRLD.</p>
+          </li>
+          <li class="tl-item reveal">
+            <p class="tl-year">2017</p>
+            <h3 class="tl-title">&ldquo;Lucid Dreams&rdquo; and &ldquo;All Girls Are the Same&rdquo;</h3>
+            <p>Both songs took off. He signed with Grade A Productions and Interscope not long after.</p>
+          </li>
+          <li class="tl-item reveal">
+            <p class="tl-year">2018</p>
+            <h3 class="tl-title">Goodbye &amp; Good Riddance</h3>
+            <p>The debut album came out in May. That same year he recorded an hour-long freestyle for Tim Westwood, all of it off the top.</p>
+          </li>
+          <li class="tl-item reveal">
+            <p class="tl-year">2019</p>
+            <h3 class="tl-title">Death Race for Love, then the end</h3>
+            <p>His second album debuted at No. 1 on the Billboard 200 in March. He died on December 8 at Chicago&rsquo;s Midway Airport, of an accidental overdose. He was 21.</p>
+          </li>
+          <li class="tl-item reveal">
+            <p class="tl-year">2020 to 2024</p>
+            <h3 class="tl-title">Legends Never Die</h3>
+            <p>Three more albums came out after he died, built from recordings he had already made. He left behind a lot of unreleased material.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ============ 999 MEANING ============ -->
+    <section class="section" id="meaning">
+      <div class="wrap">
+        <div class="split">
+          <figure class="quote-card reveal">
+            <blockquote>
+              &ldquo;999 represents taking whatever ill, whatever bad situation,
+              whatever struggle you&rsquo;re going through and turning it into
+              something positive.&rdquo;
+            </blockquote>
+            <figcaption>Juice WRLD, on the meaning of 999</figcaption>
+          </figure>
+
+          <div class="reveal">
+            <p class="eyebrow">The number</p>
+            <h2 style="font-size:var(--step-3)">Flip the 666</h2>
+            <p>
+              He had it tattooed, said it on records, and put it on the merch. It was
+              his answer to 666: take the worst thing that happened to you and flip it
+              into something you can use.
+            </p>
+            <ul class="pill-list">
+              <li>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-8-4.5-8-10a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 11c0 5.5-8 10-8 10Z"/></svg>
+                <span>He used songs to say things he didn&rsquo;t say anywhere else.</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                <span>He freestyled his verses live instead of writing them.</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>
+                <span>Fans still write 999 on things, and still mean what he meant by it.</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ LEGACY ============ -->
+    <section class="section" id="legacy">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <p class="eyebrow">Legacy</p>
+          <h2>Live free, 999</h2>
+          <p>
+            After he died, his mother Carmela Wallace started the Live Free 999 Fund.
+            It supports young people dealing with anxiety, depression and substance
+            use, which is most of what he wrote about.
+          </p>
+        </div>
+
+        <div class="quote-card reveal">
+          <blockquote style="font-size:var(--step-1)">
+            If you&rsquo;re struggling with your mental health or with using, you don&rsquo;t
+            have to deal with it on your own. Talk to someone you trust, or call a
+            crisis line. In the US and Canada you can call or text 988.
+          </blockquote>
+          <figcaption>A note from the fans who made this page</figcaption>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============ MODAL ============ -->
+  <div class="modal" id="modal" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button class="modal-close" id="modalClose" type="button">
+        <span class="sr-only">Close album details</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <path d="M6 6l12 12M18 6L6 18"/>
+        </svg>
+      </button>
+      <div class="modal-head">
+        <span class="modal-cover cover cover-a" id="modalCover">
+          <span class="cover-rings" aria-hidden="true"></span>
+          <img class="cover-img" id="modalCoverImg" alt="" width="600" height="600" decoding="async">
+        </span>
+        <span class="modal-heading">
+          <span class="modal-year" id="modalYear">2018</span>
+          <h3 id="modalTitle">Album</h3>
+        </span>
+      </div>
+      <p id="modalDesc" style="color:var(--text-muted)"></p>
+      <h4 style="font-family:'Poppins',sans-serif;font-size:var(--step--1);letter-spacing:0.14em;text-transform:uppercase;color:var(--text-dim);margin:1.75rem 0 0">Selected tracks</h4>
+      <ul class="track-list" id="modalTracks"></ul>
+    </div>
+  </div>
+
+  <!-- ============ FOOTER ============ -->
+  <footer class="footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <a class="brand" href="#top" style="margin-bottom:1rem">
+            <span class="brand-mark" aria-hidden="true">999</span>
+            <span>Juice WRLD</span>
+          </a>
+          <p style="color:var(--text-muted);font-size:var(--step--1)">
+            An unofficial fan tribute. Not affiliated with the estate of Jarad Higgins,
+            Grade A Productions or Interscope Records.
+          </p>
+        </div>
+
+        <nav aria-label="Footer">
+          <h4>Explore</h4>
+          <ul>
+            <li><a href="#discography">Discography</a></li>
+            <li><a href="#timeline">Timeline</a></li>
+            <li><a href="#meaning">The meaning of 999</a></li>
+            <li><a href="#legacy">Legacy</a></li>
+            <li><a href="../vault.html">The Vault (archive index)</a></li>
+            <li><a href="../index.html">About this project</a></li>
+          </ul>
+        </nav>
+
+        <div>
+          <h4>Support</h4>
+          <ul>
+            <li><a href="https://livefree999.org" rel="noopener noreferrer" target="_blank">Live Free 999 Fund</a></li>
+            <li><a href="https://988lifeline.org" rel="noopener noreferrer" target="_blank">988 Suicide &amp; Crisis Lifeline</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-note">
+        <p>Built as a design system demo. The layout, colors and fonts came out of ui-ux-pro-max. 999.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="main.js"></script>
+</body>
+</html>

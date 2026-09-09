@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An unofficial Juice WRLD fan project: an archive index built on live catalogue metadata, and a tribute page. Interface study, no audio.">
+  <meta name="theme-color" content="#08070C">
+  <title>999: A Juice WRLD Fan Project</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://api.juicevault.xyz" crossorigin>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="home.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to the content</a>
+
+  <!-- ==================== NAV ==================== -->
+  <nav class="site-nav" aria-label="Primary">
+    <div class="site-nav-in">
+      <a class="brand" href="index.html" aria-label="999, home">
+        <span class="brand-mark" aria-hidden="true">999</span>
+        <span class="brand-text">A Juice WRLD fan project</span>
+      </a>
+
+      <ul class="site-nav-links">
+        <li><a href="#pages">The pages</a></li>
+        <li><a href="#data">The data</a></li>
+        <li><a href="#covers">The covers</a></li>
+        <li><a href="tribute/index.html">Tribute</a></li>
+      </ul>
+
+      <a class="btn btn-primary" href="vault.html">
+        Open the Vault
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+    </div>
+  </nav>
+
+  <main id="main">
+
+    <!-- ==================== HERO ==================== -->
+    <header class="home-hero">
+      <div class="home-hero-in">
+
+        <div class="home-hero-copy">
+          <p class="label home-eyebrow">
+            <span class="home-dot" aria-hidden="true"></span>
+            Unofficial fan project &middot; interface study
+          </p>
+
+          <h1 class="home-title">
+            <span class="home-title-mark">999</span>
+            <span class="home-title-rest">The Juice WRLD archive, indexed</span>
+          </h1>
+
+          <p class="home-lede">
+            Two pages built on the juicevault catalogue. One indexes every
+            version, alternate title and session edit the archive holds. The
+            other is about the person who made it. Neither one plays music.
+          </p>
+
+          <div class="home-cta">
+            <a class="btn btn-primary btn-lg" href="vault.html">
+              Open the Vault
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </a>
+            <a class="btn btn-ghost btn-lg" href="tribute/index.html">
+              Read the tribute
+            </a>
+          </div>
+
+          <p class="home-hero-note" id="source" data-state="loading">
+            <span class="home-hero-dot" aria-hidden="true"></span>
+            <span id="sourceText">Reading the archive</span>
+          </p>
+        </div>
+
+        <!-- Real cover art, tilted and bleeding off the edge. Decorative:
+             every one of these is also reachable inside the Vault. -->
+        <div class="home-mosaic" id="mosaic" aria-hidden="true"></div>
+      </div>
+
+      <!-- Reuses the Vault's strip markup and CSS, so the drift, the double
+           render and the tile swapping all behave identically. -->
+      <div class="hero-strip home-strip">
+        <div class="strip-track" id="stripTrack"></div>
+      </div>
+    </header>
+
+    <!-- ==================== FIGURES ==================== -->
+    <section class="home-stats" aria-label="Catalogue figures">
+      <dl class="home-stats-in">
+        <div class="home-stat">
+          <dd class="mono" id="statEntries">3,879</dd>
+          <dt class="label">Entries</dt>
+        </div>
+        <div class="home-stat">
+          <dd class="mono" id="statAlts">1,499</dd>
+          <dt class="label">Alternate titles</dt>
+        </div>
+        <div class="home-stat">
+          <dd class="mono" id="statCats">6</dd>
+          <dt class="label">Categories</dt>
+        </div>
+        <div class="home-stat">
+          <dd class="mono" id="statSessions">385</dd>
+          <dt class="label">Session edits</dt>
+        </div>
+        <div class="home-stat home-stat-zero">
+          <dd class="mono">0</dd>
+          <dt class="label">Audio files</dt>
+        </div>
+      </dl>
+    </section>
+
+    <!-- ==================== THE TWO PAGES ==================== -->
+    <section class="home-band" id="pages">
+      <div class="home-in">
+        <div class="home-head">
+          <p class="label">The pages</p>
+          <h2>Two ways in</h2>
+          <p class="home-head-note">
+            One is a tool. The other is a memorial. They share a palette and a
+            type system and nothing else.
+          </p>
+        </div>
+
+        <div class="home-pages">
+          <a class="home-card" href="vault.html" style="--tint: var(--c-main)">
+            <div class="home-card-art" id="cardArtVault" aria-hidden="true"></div>
+
+            <div class="home-card-body">
+              <p class="label home-card-eyebrow">Archive index</p>
+              <h3>The Vault</h3>
+              <p>
+                Every version, alternate title and session edit the archive
+                holds, with search, category filters and cover art. Built to
+                answer one question quickly: does this thing exist, and what
+                else is it called?
+              </p>
+
+              <ul class="home-tags">
+                <li>Live catalogue</li>
+                <li>Search across alternate names</li>
+                <li>Six filters</li>
+              </ul>
+
+              <span class="home-go">
+                Open the Vault
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              </span>
+            </div>
+          </a>
+
+          <a class="home-card" href="tribute/index.html" style="--tint: var(--c-released)">
+            <div class="home-card-art home-card-art-999" aria-hidden="true">
+              <span>999</span>
+            </div>
+
+            <div class="home-card-body">
+              <p class="label home-card-eyebrow">Tribute</p>
+              <h3>Juice WRLD</h3>
+              <p>
+                Jarad Anthony Higgins, 1998 to 2019. The five studio albums, a
+                short timeline of how it happened, what 999 meant to him, and
+                where to find help if you need it.
+              </p>
+
+              <ul class="home-tags">
+                <li>Five studio albums</li>
+                <li>Timeline</li>
+                <li>Support resources</li>
+              </ul>
+
+              <span class="home-go">
+                Read the tribute
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              </span>
+            </div>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== THE DATA ==================== -->
+    <section class="home-band home-band-line" id="data">
+      <div class="home-in home-split">
+        <div class="home-split-head">
+          <p class="label">The data</p>
+          <h2>Where the catalogue comes from</h2>
+        </div>
+
+        <div class="home-split-body">
+          <p class="home-prose">
+            The Vault reads its listing live from the juicevault archive API on
+            every load, so the counts on the page are whatever the archive holds
+            right now rather than a number typed in by hand. If that request
+            fails or times out, the page falls back to a small sample bundled
+            with the site and says so in the header.
+          </p>
+
+          <ul class="home-list">
+            <li>
+              <svg class="yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+              <span>Titles, alternate names, duration, category, file size, archive date and play count.</span>
+            </li>
+            <li>
+              <svg class="yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+              <span>Cover images, loaded straight from the archive.</span>
+            </li>
+            <li>
+              <svg class="no" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+              <span>No audio. Nothing here streams, hosts, links to or downloads a recording, and the code never touches an audio endpoint.</span>
+            </li>
+          </ul>
+
+          <div class="home-grid">
+            <div class="home-item">
+              <h3>Alternate titles</h3>
+              <p>1,499 entries circulate under more than one name, so search covers those too. It is the field the whole page is designed around.</p>
+            </div>
+            <div class="home-item">
+              <h3>Six categories</h3>
+              <p>Main, instrumental, stem, cut, released and remaster, each filterable and colour coded.</p>
+            </div>
+            <div class="home-item">
+              <h3>Loaded in batches</h3>
+              <p>Sixty cards at a time as you scroll. Putting all 3,879 in the page at once would not be usable.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== THE COVERS ==================== -->
+    <section class="home-band home-band-line" id="covers">
+      <div class="home-in home-split">
+        <div class="home-split-head">
+          <p class="label">The covers</p>
+          <h2>Artwork where it exists, generated where it does not</h2>
+        </div>
+
+        <div class="home-split-body">
+          <p class="home-prose">
+            2,073 entries carry their own artwork and every one of those images
+            is distinct. The rest share a single generic placeholder per
+            category, which looks repetitive very quickly, so anything without
+            real artwork gets a cover generated from its title instead.
+          </p>
+          <p class="home-prose">
+            There are eight compositions and sixteen palettes. The layout, the
+            mark, its size and position all change between them, so these are
+            eight different designs rather than one design in eight colours. A
+            title always produces the same cover, and the compositions are dealt
+            out evenly so no two entries share both a composition and a palette.
+          </p>
+
+          <p class="label home-swatch-cap">Eight compositions, one sample each</p>
+          <div class="home-swatches" id="swatches" aria-hidden="true"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== HOW IT WAS BUILT ==================== -->
+    <section class="home-band home-band-line" id="build">
+      <div class="home-in home-split">
+        <div class="home-split-head">
+          <p class="label">The build</p>
+          <h2>How these pages were put together</h2>
+        </div>
+
+        <div class="home-split-body">
+          <p class="home-prose">
+            Both pages share one design system: a dark ground that stays close to
+            neutral so the artwork carries the colour, Righteous for display
+            type, Poppins for interface text and JetBrains Mono for anything
+            numeric that needs to line up. The palette, type pairing and page
+            patterns came out of the ui-ux-pro-max design skill and were then
+            adjusted to fit the subject.
+          </p>
+
+          <div class="home-grid">
+            <div class="home-item">
+              <h3>Split into modules</h3>
+              <p>Config, helpers, API, cover art, rendering, lightbox and the entry point are separate files, so the one place that touches the network is easy to check.</p>
+            </div>
+            <div class="home-item">
+              <h3>Fails softly</h3>
+              <p>The catalogue request times out rather than hanging, a cover that will not load falls back to a generated one, and a stalled image cannot stop the page.</p>
+            </div>
+            <div class="home-item">
+              <h3>Keyboard and motion</h3>
+              <p>Focus is trapped in dialogs and handed back on close, "/" jumps to search, and every animation stops under reduced motion.</p>
+            </div>
+            <div class="home-item">
+              <h3>No build step</h3>
+              <p>Plain ES modules and plain CSS, served as files. There is no bundler, no framework and no dependency to install.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== CLOSING CTA ==================== -->
+    <section class="home-close">
+      <div class="home-in">
+        <p class="label">Start here</p>
+        <h2 class="home-close-title">Does this thing exist, and what else is it called?</h2>
+        <p class="home-close-note">
+          That is the question the Vault was built to answer. Search runs over
+          titles and every alternate name at once.
+        </p>
+        <div class="home-cta">
+          <a class="btn btn-primary btn-lg" href="vault.html">
+            Open the Vault
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+          <a class="btn btn-ghost btn-lg" href="tribute/index.html">
+            Read the tribute
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ==================== FOOTER ==================== -->
+  <footer class="home-foot">
+    <div class="home-in home-foot-in">
+      <div class="home-foot-brand">
+        <span class="brand-mark" aria-hidden="true">999</span>
+        <p>
+          An unofficial fan project, not affiliated with the estate of Jarad
+          Higgins, Grade A Productions or Interscope Records. Cover images
+          belong to their respective owners and are shown here to identify
+          recordings.
+        </p>
+      </div>
+
+      <nav class="home-foot-nav" aria-label="Footer">
+        <div>
+          <p class="label">Pages</p>
+          <ul>
+            <li><a href="vault.html">The Vault</a></li>
+            <li><a href="tribute/index.html">Tribute</a></li>
+          </ul>
+        </div>
+        <div>
+          <p class="label">This page</p>
+          <ul>
+            <li><a href="#data">The data</a></li>
+            <li><a href="#covers">The covers</a></li>
+            <li><a href="#build">The build</a></li>
+          </ul>
+        </div>
+      </nav>
+    </div>
+  </footer>
+
+  <script type="module" src="js/home.js"></script>
+</body>
+</html>
