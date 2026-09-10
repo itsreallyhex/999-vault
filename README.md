@@ -3,8 +3,7 @@
 A fan-made site about the Juice WRLD archive. It has three pages: a home page,
 a searchable index of the archive called the Vault, and a tribute page.
 
-It does not play music. It shows the details of each track and the cover art,
-and that is all.
+It shows the details of each track and the cover art.
 
 ![The home page](Assets/landingpage.png)
 
@@ -39,10 +38,6 @@ need it.
 ![The tribute page](Assets/tributeview.png)
 
 ## Things worth knowing
-
-**There is no audio anywhere.** The archive API can hand out MP3 and WAV files,
-but this site never asks for them. No player, no download links, nothing that
-points at an audio file. That was the rule the whole thing was built around.
 
 **The numbers are live.** The Vault asks the archive for its list every time you
 open it, so the counts you see are whatever the archive holds right now, not a

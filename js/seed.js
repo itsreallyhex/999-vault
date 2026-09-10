@@ -3,7 +3,7 @@
 
    Only used when the live archive fetch in api.js fails. Metadata
    sampled from the public juicevault catalogue: titles, alternate
-   names, durations, category, file size, archive date. No audio.
+   names, durations, category, file size, archive date.
    ============================================================ */
 export const SEED = [
   {"t": "Moncler Year (v3)", "a": ["Moncler Year (v1.2)"], "len": "2:47", "c": "main", "sz": "7.1 MB", "p": 14063, "d": "2026-02-12", "se": false},

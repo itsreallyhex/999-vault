@@ -162,7 +162,7 @@
   display: grid; gap: 1.4rem 1rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-@media (min-width: 700px) { .home-stats-in { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+@media (min-width: 700px) { .home-stats-in { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 
 .home-stat dd {
   margin: 0;
@@ -170,10 +170,6 @@
   line-height: 1; font-weight: 500; color: var(--text);
 }
 .home-stat dt { margin-top: 0.5rem; }
-
-/* The point of the whole project, so it reads as a claim rather than
-   as a count that happens to be zero. */
-.home-stat-zero dd { color: var(--c-released); }
 
 /* ============================================================
    BANDS
@@ -311,7 +307,7 @@
 }
 .home-item p { color: var(--faint); font-size: var(--step--1); line-height: 1.65; margin: 0; }
 
-/* A short labelled list, used for the "what is and isn't included" pairs */
+/* A short labelled list of what the archive record carries */
 .home-list { display: grid; gap: 0.6rem; margin-top: 1.5rem; }
 .home-list li {
   display: flex; gap: 0.7rem; align-items: flex-start;
@@ -319,7 +315,6 @@
 }
 .home-list svg { width: 18px; height: 18px; flex: none; margin-top: 0.25rem; }
 .home-list .yes { color: #34D399; }
-.home-list .no { color: #FB7185; }
 
 /* ---------- Sample of the generated covers ---------- */
 .home-swatch-cap { display: block; margin-top: 2rem; }

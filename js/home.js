@@ -19,9 +19,6 @@
    Everything after step 1 is progressive: the markup already carries
    the measured figures and every image box already holds its own
    height, so a slow or failed fetch changes nothing about the layout.
-
-   Metadata and cover images only. No audio endpoint is touched here or
-   anywhere else in this project.
    ============================================================ */
 
 import { fetchCatalogue } from './api.js';

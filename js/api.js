@@ -2,8 +2,7 @@
    Archive API.
 
    The only module that talks to the network. Two endpoints are used:
-   the catalogue listing, and the cover images it points at. Audio
-   endpoints are deliberately not touched anywhere in this project.
+   the catalogue listing, and the cover images it points at.
    ============================================================ */
 
 import { API_BASE, REQUEST_TIMEOUT } from './config.js';
