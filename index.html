@@ -190,11 +190,12 @@
 
         <div class="home-split-body">
           <p class="home-prose">
-            The Vault reads its listing live from the juicevault archive API on
-            every load, so the counts on the page are whatever the archive holds
-            right now rather than a number typed in by hand. If that request
-            fails or times out, the page falls back to a small sample bundled
-            with the site and says so in the header.
+            The listing comes from the juicevault archive, and a copy of it sits
+            in this project. The Vault reads that copy first, so a normal load
+            asks nothing of the network and the page still works with the
+            archive unreachable. With no copy saved it asks the archive
+            directly, and if that fails too it falls back to a small sample
+            bundled with the site. The header says which one it used.
           </p>
 
           <ul class="home-list">
@@ -204,7 +205,7 @@
             </li>
             <li>
               <svg class="yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
-              <span>Cover images, loaded straight from the archive.</span>
+              <span>Cover images, saved alongside the listing or pulled from the archive.</span>
             </li>
           </ul>
 

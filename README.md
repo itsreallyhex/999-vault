@@ -46,7 +46,26 @@ need it.
 
 ## Things worth knowing
 
-**Everything is stored here now. The API is a fallback, not the source.**
+**The site works online or fully offline. That part is up to me.**
+
+Either way the pages behave the same. The difference is only how much of the
+archive is sitting on my own disk:
+
+| | what it needs | disk |
+| --- | --- | --- |
+| Online | nothing saved, asks the API each load | 0 |
+| Catalogue saved | one command | 1.67 MB |
+| Catalogue and covers | one command | 103 MB |
+| Plus the audio | see [tools/README.md](tools/README.md) | 26 GB |
+
+The listing and the artwork are the easy part. `tools/save-catalogue.py` fetches
+both, and needs no account, no key and no setup. Two minutes and the site never
+has to touch the network again.
+
+Audio is the involved one, because it is 26 GB and needs a login. That has its
+own guide: **[tools/README.md](tools/README.md)**, step by step.
+
+**The API is a fallback now, not the source.**
 
 The site used to ask `api.juicevault.xyz` for the catalogue on every single
 load, which meant somebody else's server being slow, down, or gone one day
@@ -54,8 +73,8 @@ decided whether my own pages worked. That is a silly thing to accept on a
 project that runs entirely on my own machine, so the data lives here instead:
 
 ```text
-data/catalogue.json    1.7 MB     all 3,879 records
-data/covers/            238 MB     3,879 cover images
+data/catalogue.json    1.67 MB    all 3,879 records
+data/covers/            102 MB    1,877 cover images
 ```
 
 A normal page load now makes **one request, to my own machine**, and nothing
@@ -93,8 +112,9 @@ loading skeletons for twelve seconds first.
 ### Refreshing it
 
 ```bash
-python tools/save-catalogue.py                    # catalogue only, 1.7 MB
-python tools/save-catalogue.py --covers           # catalogue and every cover
+python tools/save-catalogue.py                    # catalogue only, 1.67 MB
+python tools/save-catalogue.py --covers           # catalogue and any new covers
+python tools/save-catalogue.py --dedupe           # tidy covers on disk, no network
 python tools/save-catalogue.py --covers --force   # re-download covers I already have
 ```
 
@@ -110,11 +130,29 @@ instead: 8 layouts and 16 colour sets, and the same title always gets the same
 one. That generated cover also sits underneath every real image, so a cover
 that fails to load does not leave a hole, it just reveals the drawn one.
 
-A quirk worth knowing about the saved covers: there are 3,879 files but only
-1,877 distinct images. Entries without their own artwork share a grey
-placeholder per category, and each record still points at its own copy of it,
-so one image is on disk 723 times. Deduplicating would save roughly half the
-238 MB. Not worth the complexity for a folder that is gitignored anyway.
+**Identical covers are stored once.** The archive gives every record its own
+cover id even when the image is byte-identical, so the first pass put the same
+instrumental placeholder on disk 723 times: 3,879 files holding 1,877 distinct
+images, 238 MB where 102 MB would do.
+
+Files are now named after the sha1 of their own bytes, and
+`data/covers-index.json` maps each record to its hash. Identical images
+collapse to one file and every record that uses it points at the same path.
+723 records share a single file now. That also makes a re-run cheap: anything
+already in the index is skipped without a request, so only genuinely new
+covers get fetched.
+
+```bash
+python tools/save-catalogue.py --dedupe     # tidy what is already on disk
+```
+
+That one makes no network request at all. It hashes the files I already have,
+keeps one copy of each distinct image, and repoints the saved catalogue.
+
+There is no way to spot a duplicate *before* downloading it, so a first run
+still pulls all 3,879. The `?v=` hash in the cover URL is per record, so 723
+identical images carry 723 different values, and the CDN's ETag encodes upload
+time rather than content. Only the bytes tell the truth.
 
 **This is a personal fan project.** It is not published, and it is not
 connected to the estate of Jarad Higgins, Grade A Productions or Interscope
@@ -170,10 +208,15 @@ home.css        home page styles, layered on style.css
 serve.py        the local server, no-cache and loopback only
 tribute/        the tribute page, with its own CSS and JS
 data/
-  catalogue.json  my saved copy of the archive, read before the network
-  covers/         the saved cover images, gitignored
+  catalogue.json    my saved copy of the archive, read before the network
+  covers/           cover images, named by hash so identical art is stored
+                    once. gitignored
+  covers-index.json record id to cover hash. gitignored, rebuildable
+  audio/            the songs, if I have pulled them. gitignored
 tools/
-  save-catalogue.py  writes both of the above
+  README.md          how to download the audio, step by step
+  save-catalogue.py  writes the catalogue and the covers
+  save-audio.py      downloads the songs
 js/
   config.js     settings and constants
   utils.js      small helpers
