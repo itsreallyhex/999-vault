@@ -4,7 +4,8 @@ A personal project. A fan-made site about the Juice WRLD archive: a home page,
 a searchable index of the archive called the Vault, playlists saved in the
 browser, and a tribute page.
 
-It shows the details of each track and the cover art.
+It shows the details of each track and the cover art, and plays the songs I
+have pulled to disk.
 
 **It is not hosted anywhere.** There is no live URL and there is not going to
 be one. I built it for myself, I run it from a local server on my own machine,
@@ -32,9 +33,59 @@ What you can do with it:
 - Click any cover to see the full record: every other name it goes by, how long
   it runs, the file size and when the archive added it.
 - Press `/` to jump straight to the search box.
+- Play a track, if I have pulled the audio. Hovering a cover shows a play
+  button, and the detail panel has one too.
 
 Cards load 60 at a time as you scroll, because putting all 3,879 on the page at
 once is too slow to use.
+
+### Playlists
+
+My own running orders over the archive. Every card in the Vault has an add
+button, and `playlists.html` is where they get arranged: rename, reorder,
+remove, and play the list from any row.
+
+They live in the browser's own database, in one browser profile on this
+machine. There is no account and no server holding them, which is exactly why
+the page has an export and an import sitting in plain sight rather than buried
+in a menu. Clearing site data takes them with it, so the export is the only
+copy that survives that.
+
+A saved row keeps its own copy of the track, not a pointer at the catalogue.
+It costs a little space and means a playlist still reads correctly with the
+archive unreachable.
+
+### The player
+
+A bar fixed to the bottom of the Vault and the playlists page. It stays there
+while I move between the two, picking up whatever was playing.
+
+Play, pause, previous, next, a seek bar I can drag with the elapsed and total
+time either side, volume, shuffle and repeat. Volume is remembered between
+visits. The bar tints itself from the artwork of whatever is playing, using
+the same palette the cover art is drawn from, so it is never a colour that
+fights the picture.
+
+The two pages behave differently on purpose, because they are different things:
+
+- **In the Vault**, tracks are a pile, not an order. A track that finishes
+  stops. **Next** picks at random, and it stays inside whatever I have
+  filtered to: if I am looking at instrumentals, Next gives me an
+  instrumental. It also avoids the last 200 things it played, so a long
+  session does not keep circling the same handful. That list of 200 is kept
+  in the browser database and survives a reload. **Previous** walks back
+  through what I actually played, which is the only thing that makes sense
+  when forward is random.
+- **In a playlist**, tracks are an order. They play top to bottom and advance
+  on their own. **Shuffle** deals a random order once and then follows it, so
+  it works through the whole list without repeating a track or skipping one.
+
+Repeat cycles through off, all and one.
+
+It only plays what is actually on my disk. 2,662 of the 3,879 records have
+audio saved, because I skipped instrumentals, cuts and released tracks. The
+rest still show a play button, and pressing it says the file is not saved
+rather than failing quietly. Nothing here streams from the archive.
 
 ### The tribute
 
@@ -55,7 +106,7 @@ archive is sitting on my own disk:
 | --- | --- | --- |
 | Online | nothing saved, asks the API each load | 0 |
 | Catalogue saved | one command | 1.67 MB |
-| Catalogue and covers | one command | 103 MB |
+| Catalogue and covers | one command | 104 MB |
 | Plus the audio | see [tools/README.md](tools/README.md) | 26 GB |
 
 The listing and the artwork are the easy part. `tools/save-catalogue.py` fetches
@@ -63,7 +114,9 @@ both, and needs no account, no key and no setup. Two minutes and the site never
 has to touch the network again.
 
 Audio is the involved one, because it is 26 GB and needs a login. That has its
-own guide: **[tools/README.md](tools/README.md)**, step by step.
+own guide: **[tools/README.md](tools/README.md)**, step by step. It is also the
+one that changes what the site can do rather than just where it reads from:
+without it the pages are a catalogue, and with it the player works.
 
 **The API is a fallback now, not the source.**
 
@@ -118,11 +171,37 @@ python tools/save-catalogue.py --dedupe           # tidy covers on disk, no netw
 python tools/save-catalogue.py --covers --force   # re-download covers I already have
 ```
 
-Nothing expires and nothing updates itself. Running that script is the entire
+Nothing expires and nothing updates itself. Running a script is the entire
 update mechanism, which is the point: the data changes when I decide it
-changes, not when someone else edits their database. The trade is that my copy
-drifts from the archive over time. If a title gets corrected upstream, I keep
-the old one until I re-run.
+changes, not when someone else edits their database.
+
+### Getting just what is new
+
+`save-catalogue.py` replaces the whole snapshot. Most of the time I only want
+the difference, and that is what `sync.py` is for:
+
+```bash
+python tools/sync.py --check    # what has the archive added? change nothing
+python tools/sync.py            # show me, ask, then fetch it
+```
+
+It compares the saved copy against the live listing and tells me what is new,
+what has been removed, and what has been retitled upstream. If I say yes it
+downloads the audio for the new main, stem and remaster records, picks up any
+new covers, and rewrites the catalogue. Then I reload the browser.
+
+Two things it gets right that are easy to get wrong:
+
+- **It usually needs no login.** The token faff in
+  [tools/README.md](tools/README.md) is because the first pull was 2,662 files.
+  A few new songs fit inside the anonymous allowance of 500 a day.
+- **The category filter is on the audio, not the catalogue.** Every new record
+  goes into `catalogue.json` whatever it is, so the Vault keeps listing
+  everything. Only main, stem and remaster get downloaded.
+
+It also fixes the drift. A title corrected upstream stays wrong in my copy
+until something re-reads the listing, and this is the thing that re-reads it
+without re-fetching 26 GB.
 
 **Covers are real where the archive has them.** 2,073 entries come with their
 own art, and anything without real art gets a cover drawn from its title
@@ -174,17 +253,35 @@ python serve.py
 
 Then open <http://127.0.0.1:8777>.
 
-`serve.py` is a twenty line wrapper around Python's own `http.server` that
-fixes two things it gets wrong here:
+`serve.py` is a small wrapper around Python's own `http.server` that fixes four
+things it gets wrong here. The first two have always been needed. The last two
+are what it takes to serve audio at all:
 
 - **It sends `Cache-Control: no-store`.** The built in server sends no cache
   headers at all, so browsers hold on to JavaScript heuristically and I end up
   staring at a page I already fixed, debugging a file that is no longer on
-  disk. This is the single most confusing failure mode in the project.
-- **It forces the JavaScript MIME type.** `http.server` reads it from the
-  Windows registry, which on some machines answers `text/plain`. Browsers hard
-  refuse ES modules served that way and the page goes blank with no useful
-  error.
+  disk. This is the single most confusing failure mode in the project. Audio
+  is the one exception, because I never edit a track mid-session and
+  re-fetching one every time I drag the seek bar is pointless.
+- **It forces the MIME types.** `http.server` reads them from the Windows
+  registry, which on some machines answers `text/plain`. Browsers hard refuse
+  ES modules served that way and the page goes blank with no useful error.
+  The audio types are pinned for the same reason: a wrong one makes the
+  browser refuse a file that is perfectly good.
+- **It handles more than one request at a time.** The built in server does
+  one. A playing track holds its connection open for the whole song, so on
+  the old server one track would block every cover and every script behind
+  it and the page would look frozen.
+- **It answers range requests.** The built in server ignores them and sends
+  the whole file, which means the browser cannot jump to a part of a song it
+  has not already downloaded, and dragging the seek bar snaps back.
+
+If a change to the server seems to do nothing, check nothing older is still
+listening: on Windows a second copy can bind the same port and answer instead.
+
+```bash
+netstat -ano | grep :8777
+```
 
 Plain `python -m http.server 8777 --bind 127.0.0.1` works for a quick look, but
 expect the cache to bite the moment I edit anything.
@@ -205,7 +302,8 @@ vault.html      the archive index
 playlists.html  my playlists, saved in the browser
 style.css       shared colours, fonts, nav, buttons and the cover art system
 home.css        home page styles, layered on style.css
-serve.py        the local server, no-cache and loopback only
+player.css      the player bar and its play buttons, layered on style.css
+serve.py        the local server: no-cache, loopback, threaded, range requests
 tribute/        the tribute page, with its own CSS and JS
 data/
   catalogue.json    my saved copy of the archive, read before the network
@@ -213,10 +311,15 @@ data/
                     once. gitignored
   covers-index.json record id to cover hash. gitignored, rebuildable
   audio/            the songs, if I have pulled them. gitignored
+  audio-index.json  record id to saved filename. gitignored, and the only
+                    way the player knows which file is which, because the
+                    names are cleaned up and the extensions vary.
+                    rebuildable from the files on disk, no downloads
 tools/
   README.md          how to download the audio, step by step
   save-catalogue.py  writes the catalogue and the covers
   save-audio.py      downloads the songs
+  sync.py            fetches only what the archive has added since last time
 js/
   config.js     settings and constants
   utils.js      small helpers
@@ -226,6 +329,7 @@ js/
   ui.js         drawing the page
   lightbox.js   the detail panel
   picker.js     the add-to-playlist dialog
+  player.js     the only file that owns an audio element, for playback
   app.js        Vault startup
   home.js       home page startup
   playlists.js  playlists startup
