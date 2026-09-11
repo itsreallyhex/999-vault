@@ -23,6 +23,7 @@
 
       <ul class="site-nav-links">
         <li><a href="vault.html" aria-current="page">The Vault</a></li>
+        <li><a href="playlists.html">Playlists</a></li>
         <li><a href="tribute/index.html">Tribute</a></li>
         <li><a href="index.html#data">About the data</a></li>
       </ul>
@@ -132,6 +133,7 @@
           <p class="label">Pages</p>
           <ul>
             <li><a href="index.html">About this project</a></li>
+            <li><a href="playlists.html">Playlists</a></li>
             <li><a href="tribute/index.html">Tribute</a></li>
           </ul>
         </div>
@@ -178,12 +180,57 @@
           <dl class="dl" id="lbMeta"></dl>
         </div>
 
+        <div class="lb-actions">
+          <button class="btn btn-primary" id="lbAdd" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            Add to a playlist
+          </button>
+          <a class="btn btn-ghost" href="playlists.html">Open playlists</a>
+        </div>
+
         <p class="lb-note">
           Covers are official artwork where a release exists, otherwise generated from the title.
         </p>
       </div>
     </div>
   </div>
+
+  <!-- ==================== ADD TO PLAYLIST ====================
+       A native <dialog>: showModal() handles the backdrop, the focus
+       trap and the Escape key, so this one does not need the manual
+       trap the lightbox above carries. -->
+  <dialog class="picker" id="picker" aria-labelledby="pickerTitle">
+    <div class="picker-in">
+      <div class="picker-head">
+        <span class="picker-shot" id="pickerShot" aria-hidden="true"></span>
+        <div class="picker-id">
+          <p class="lb-cat" id="pickerCatRow"><span class="dot" aria-hidden="true"></span><span id="pickerCat"></span></p>
+          <h2 class="picker-title" id="pickerTitle"></h2>
+        </div>
+        <button class="picker-close" id="pickerClose" type="button">
+          <span class="sr-only">Close</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18"/>
+          </svg>
+        </button>
+      </div>
+
+      <ul class="picker-list" id="pickerList" hidden></ul>
+
+      <p class="picker-empty" id="pickerEmpty" hidden>
+        No playlists yet. Name one below and this track goes straight into it.
+      </p>
+
+      <form class="picker-new" id="pickerNew">
+        <label class="sr-only" for="pickerName">New playlist name</label>
+        <input class="pl-input" id="pickerName" type="text" maxlength="80"
+               autocomplete="off" placeholder="New playlist name">
+        <button class="btn btn-primary" type="submit">Create and add</button>
+      </form>
+
+      <p class="picker-note" id="pickerNote" role="status" aria-live="polite"></p>
+    </div>
+  </dialog>
 
   <script type="module" src="js/app.js"></script>
 </body>

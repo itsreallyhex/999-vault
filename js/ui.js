@@ -9,14 +9,24 @@ import { CATEGORIES } from './config.js';
 import { make, niceDate, group } from './utils.js';
 import { buildCover } from './covers.js';
 
-/** Element references, bound once from the ids in index.html. */
+/**
+ * Element references, bound once from the ids in vault.html.
+ *
+ * An id the current page does not carry binds to null rather than
+ * throwing, which is what lets other pages import the pure helpers
+ * below without owning the Vault's markup: home.js already does it for
+ * renderStrip, and playlists.js does it for swatchFor. Anything
+ * reaching for `el.x` therefore has to tolerate a null.
+ */
 export const el = {};
 
 [
   'search', 'searchRow', 'searchClear', 'chips', 'count', 'sortSelect', 'rows',
   'empty', 'heroFigs', 'stripTrack', 'source', 'sourceText', 'more', 'moreBtn',
   'moreCount', 'sentinel', 'lightbox', 'lbClose', 'lbCover', 'lbMark', 'lbImg',
-  'lbCat', 'lbCatName', 'lbTitle', 'lbAlts', 'lbAltsEmpty', 'lbMeta'
+  'lbCat', 'lbCatName', 'lbTitle', 'lbAlts', 'lbAltsEmpty', 'lbMeta', 'lbAdd',
+  'picker', 'pickerShot', 'pickerTitle', 'pickerCat', 'pickerClose',
+  'pickerList', 'pickerEmpty', 'pickerNew', 'pickerName', 'pickerNote'
 ].forEach((id) => { el[id] = document.getElementById(id); });
 
 /** CSS custom property carrying a category's colour. */
@@ -213,8 +223,26 @@ export function renderChips(data, state, onSelect) {
 }
 
 /* ---------- Cards ---------- */
-function buildCard(track, onOpen) {
-  const li = document.createElement('li');
+
+/** The plus on a card's add button. SVG needs createElementNS. */
+function plusIcon() {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2.2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+
+  const path = document.createElementNS(ns, 'path');
+  path.setAttribute('d', 'M12 5v14M5 12h14');
+  svg.appendChild(path);
+  return svg;
+}
+
+function buildCard(track, onOpen, onAdd) {
+  const li = make('li', 'cell');
 
   const btn = make('button', 'card');
   btn.type = 'button';
@@ -257,6 +285,19 @@ function buildCard(track, onOpen) {
   btn.addEventListener('click', () => onOpen(track, btn));
 
   li.appendChild(btn);
+
+  // A sibling of the card, not a child: the card is itself a <button>,
+  // and a button inside a button is invalid and will not receive
+  // clicks. The <li> is the positioning context that places it.
+  if (onAdd) {
+    const add = make('button', 'card-add');
+    add.type = 'button';
+    add.appendChild(plusIcon());
+    add.appendChild(make('span', 'sr-only', `Add ${track.t} to a playlist`));
+    add.addEventListener('click', () => onAdd(track, add));
+    li.appendChild(add);
+  }
+
   return li;
 }
 
@@ -276,12 +317,15 @@ export function renderSkeleton() {
  * Draw the grid.
  * `list` is the full filtered set; only the first `shown` are built,
  * so the DOM never holds thousands of cards at once.
+ *
+ * `onAdd` is optional. Passing it puts an add-to-playlist button on
+ * every card; leaving it out renders the grid exactly as before.
  */
-export function renderGrid(list, shown, onOpen) {
+export function renderGrid(list, shown, onOpen, onAdd) {
   const batch = list.slice(0, shown);
 
   const frag = document.createDocumentFragment();
-  batch.forEach((track) => frag.appendChild(buildCard(track, onOpen)));
+  batch.forEach((track) => frag.appendChild(buildCard(track, onOpen, onAdd)));
 
   el.rows.textContent = '';
   el.rows.appendChild(frag);

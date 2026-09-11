@@ -14,7 +14,8 @@ import {
   el, setSource, renderHero, renderStrip, renderChips,
   renderSkeleton, renderGrid, renderCount
 } from './ui.js';
-import { openLightbox, closeLightbox, isOpen, trapTab } from './lightbox.js';
+import { openLightbox, closeLightbox, isOpen, trapTab, setAddHandler } from './lightbox.js';
+import { openPicker, isPickerOpen } from './picker.js';
 import { SEED } from './seed.js';
 
 /* ---------- State ---------- */
@@ -52,7 +53,7 @@ function visible() {
 function draw(reset) {
   if (reset) shown = PAGE_SIZE;
   const list = visible();
-  renderGrid(list, shown, openLightbox);
+  renderGrid(list, shown, openLightbox, openPicker);
   renderCount(list, state);
 }
 
@@ -101,7 +102,15 @@ el.sortSelect.addEventListener('change', () => {
   draw(true);
 });
 
+/* The picker is opened from a card and from inside the lightbox */
+setAddHandler(openPicker);
+
 document.addEventListener('keydown', (event) => {
+  // The picker is a native <dialog>: it closes itself on Escape and
+  // traps Tab on its own. Standing aside is what stops one Escape from
+  // also closing the lightbox underneath it.
+  if (isPickerOpen()) return;
+
   if (event.key === 'Escape') {
     if (isOpen()) { closeLightbox(); return; }
     if (document.activeElement === el.search && el.search.value) clearSearch();

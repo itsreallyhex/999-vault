@@ -174,6 +174,16 @@ img { display: block; max-width: 100%; }
 .btn-ghost:hover { border-color: var(--accent-2); background: var(--bg-2); }
 
 .btn-lg { min-height: 52px; padding: 0.8rem 1.6rem; font-size: var(--step-1); }
+/* Only for controls inside a panel that already has its own padding,
+   never for a primary action: it is under the 44px touch target. */
+.btn-sm { min-height: 38px; padding: 0.4rem 0.95rem; font-size: var(--step--1); }
+
+/* Visible field label, as against .label which is a section eyebrow */
+.lbl {
+  display: block; font-family: 'JetBrains Mono', monospace;
+  font-size: var(--step--2); letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--faint); margin-bottom: 0.35rem;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .btn:hover svg { transform: none; }
@@ -709,6 +719,440 @@ img { display: block; max-width: 100%; }
 .foot a:hover { color: var(--accent-2); }
 
 /* ============================================================
+   PLAYLISTS
+   The add button on a card, the picker dialog it opens, and
+   playlists.html itself. Everything here reuses the tokens, the
+   button system and the cover system above, so a playlist row and a
+   grid card cannot drift apart.
+   ============================================================ */
+
+/* ---------- Add button on a card ---------- */
+
+/* The card is itself a <button>, so the add control is a sibling
+   rather than a child. This is what positions it over the artwork. */
+.cell { position: relative; }
+
+.card-add {
+  position: absolute; top: 0.45rem; right: 0.45rem; z-index: 5;
+  width: 32px; height: 32px; display: grid; place-items: center;
+  border-radius: 50%; border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(8,7,12,0.78); color: var(--text);
+  cursor: pointer; opacity: 0; pointer-events: none;
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease),
+              background-color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.card-add svg { width: 16px; height: 16px; }
+.cell:hover .card-add,
+.card-add:focus-visible { opacity: 1; pointer-events: auto; }
+.card-add:hover {
+  background: var(--accent); border-color: var(--accent);
+  color: #FFFFFF; transform: scale(1.08);
+}
+
+/* Nothing to hover with on a touch screen, so it stays out */
+@media (hover: none) {
+  .card-add { opacity: 1; pointer-events: auto; }
+}
+
+/* ---------- Lightbox actions ---------- */
+.lb-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1.4rem; }
+/* The slide is meant for the trailing arrows elsewhere; this icon leads */
+.lb-actions .btn:hover svg { transform: none; }
+
+/* ---------- Shared field ---------- */
+.pl-input {
+  flex: 1 1 auto; min-width: 0; min-height: 44px;
+  padding: 0.55rem 0.85rem; border-radius: var(--r);
+  border: 1px solid var(--line-2); background: var(--bg-3); color: var(--text);
+  font: inherit;
+  transition: border-color var(--dur) var(--ease);
+}
+.pl-input::placeholder { color: var(--faint); }
+.pl-input:focus { border-color: var(--accent); }
+
+/* ---------- Picker dialog ---------- */
+
+/* A native <dialog>, so the UA centres it and paints the backdrop. The
+   chrome lives on .picker-in; the dialog itself is only a frame. */
+.picker {
+  width: min(440px, calc(100vw - 1.5rem));
+  padding: 0; border: 0; background: transparent; color: var(--text);
+}
+.picker::backdrop {
+  background: rgba(4, 3, 7, 0.82);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.picker-in {
+  position: relative; isolation: isolate;
+  display: grid; gap: 0.9rem;
+  max-height: min(80svh, 660px); overflow-y: auto;
+  padding: clamp(1rem, 0.8rem + 0.6vw, 1.35rem);
+  background: var(--bg-2); border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  box-shadow: 0 40px 90px -40px rgba(0,0,0,0.95);
+}
+/* Tinted by the cover of the track being filed, the same way the
+   playlists hero is. Behind the content, never over it. */
+.picker-in::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  border-radius: inherit; pointer-events: none;
+  background: radial-gradient(120% 90% at 0% 0%, var(--wash, var(--accent)) 0%, transparent 58%);
+  opacity: 0.22;
+}
+
+.picker-head { display: flex; align-items: center; gap: 0.85rem; }
+.picker-shot { width: 62px; flex: none; container-type: inline-size; }
+.picker-shot .cover { border-radius: 10px; }
+.picker-id { min-width: 0; margin-right: auto; }
+.picker-title {
+  font-family: 'Righteous', 'Poppins', sans-serif;
+  font-size: var(--step-1); line-height: 1.25; margin-top: 0.25rem;
+  overflow-wrap: anywhere;
+}
+.picker-close {
+  flex: none; width: 38px; height: 38px; display: grid; place-items: center;
+  border-radius: 50%; border: 1px solid var(--line-2);
+  background: var(--bg-3); color: var(--dim); cursor: pointer;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.picker-close:hover { color: var(--text); border-color: var(--accent-2); }
+.picker-close svg { width: 17px; height: 17px; }
+
+.picker-list { display: grid; gap: 0.3rem; max-height: 44svh; overflow-y: auto; }
+.pick {
+  width: 100%; display: flex; align-items: center; gap: 0.7rem; text-align: left;
+  padding: 0.6rem 0.7rem; border-radius: var(--r);
+  border: 1px solid var(--line); background: var(--bg-3); color: inherit;
+  cursor: pointer;
+  transition: border-color var(--dur) var(--ease);
+}
+.pick:hover:not(:disabled) { border-color: var(--line-2); }
+.pick:disabled { opacity: 0.55; cursor: default; }
+
+.pick-box {
+  flex: none; width: 22px; height: 22px; display: grid; place-items: center;
+  border-radius: 7px; border: 1px solid var(--line-2); color: transparent;
+  transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.pick-box svg { width: 14px; height: 14px; }
+.pick[aria-pressed="true"] .pick-box {
+  background: var(--swatch, var(--accent));
+  border-color: var(--swatch, var(--accent));
+  color: #08070C;
+}
+
+.pick-body { display: grid; gap: 0.1rem; min-width: 0; }
+.pick-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-n {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--step--2); color: var(--faint);
+}
+
+.picker-new { display: flex; gap: 0.5rem; }
+.picker-empty, .picker-note {
+  color: var(--faint); font-size: var(--step--1); line-height: 1.6;
+}
+.picker-note { min-height: 1.3em; }
+
+/* ---------- Playlists: the hero ----------
+   One band, two states. data-mode="empty" is the library landing;
+   data-mode="list" is the selected playlist. */
+.pl-hero {
+  position: relative; overflow: hidden;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-2);
+}
+
+/* The band takes the palette of the playlist's own first cover, put on
+   --wash by playlists.js, so the chrome and the artwork sitting on it
+   can never disagree. Plain gradients rather than color-mix: the
+   strength comes from the layer's own opacity, which degrades safely
+   on an engine that does not know the function. */
+.pl-hero-wash {
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(105% 130% at 14% 0%, var(--wash, var(--accent)) 0%, transparent 58%),
+    linear-gradient(180deg, var(--wash-2, var(--bg-3)) 0%, transparent 74%);
+  opacity: 0;
+  transition: opacity 420ms var(--ease);
+}
+.pl-hero[data-mode="list"] .pl-hero-wash { opacity: 0.34; }
+
+.pl-hero-in {
+  position: relative; z-index: 1;
+  padding-block: clamp(1.75rem, 1.2rem + 2.4vw, 3.25rem);
+  display: grid; gap: clamp(1.1rem, 0.6rem + 2vw, 2.25rem);
+  align-items: end;
+}
+@media (min-width: 720px) {
+  .pl-hero-in { grid-template-columns: auto minmax(0, 1fr); }
+}
+
+/* min-width: 0 or a long name refuses to shrink and pushes the grid
+   track wider than the viewport */
+.pl-hero-body { min-width: 0; }
+.pl-kind { margin-bottom: 0.5rem; }
+.pl-title {
+  font-family: 'Righteous', 'Poppins', sans-serif;
+  font-size: clamp(2rem, 1.1rem + 4.2vw, 4.25rem);
+  line-height: 0.98; letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+.pl-lede { margin-top: 0.85rem; color: var(--dim); max-width: 48ch; line-height: 1.7; }
+.pl-stats {
+  margin-top: 0.95rem; color: var(--text);
+  font-size: var(--step--1); opacity: 0.82;
+}
+.pl-figs {
+  margin-top: 1.3rem;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 158px)); gap: 0.7rem;
+}
+.pl-hero-acts { margin-top: 1.4rem; display: flex; flex-wrap: wrap; gap: 0.6rem; }
+
+/* ---------- Cover mosaic ----------
+   Up to four covers stacked into one square. The cell count is on
+   data-n so one, two and three lay out deliberately rather than
+   leaving holes in a 2x2. */
+.pl-hero-art {
+  width: clamp(148px, 32vw, 236px); aspect-ratio: 1;
+  display: grid; gap: 2px;
+  grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+  border-radius: var(--r-lg); overflow: hidden;
+  background: var(--bg-3);
+  box-shadow: 0 34px 64px -26px rgba(0,0,0,0.95);
+  transition: transform 420ms var(--ease);
+}
+.pl-hero[data-mode="list"] .pl-hero-art { transform: rotate(-1.5deg); }
+
+.pl-hero-art[data-n="0"],
+.pl-hero-art[data-n="1"] { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+.pl-hero-art[data-n="2"] { grid-template-rows: 1fr; }
+.pl-hero-art[data-n="3"] .mos-cell:first-child { grid-row: span 2; }
+
+.mos-cell { position: relative; overflow: hidden; container-type: inline-size; }
+/* .cover is square by default, which fights a half-height mosaic cell */
+.mos-cell .cover { aspect-ratio: auto; height: 100%; border-radius: 0; }
+
+.mos-mark {
+  display: grid; place-items: center;
+  font-family: 'Righteous', sans-serif; font-size: 2.4rem;
+  color: var(--line-2); letter-spacing: 0.04em;
+}
+
+/* ---------- Board ---------- */
+.pl-board {
+  padding-block: clamp(1.5rem, 1rem + 2vw, 2.5rem) 4rem;
+  display: grid; gap: clamp(1rem, 0.6rem + 1.5vw, 1.75rem); align-items: start;
+}
+@media (min-width: 940px) {
+  .pl-board { grid-template-columns: minmax(0, 296px) minmax(0, 1fr); }
+  /* Pane and blank share one cell: exactly one is ever shown */
+  .pl-side { grid-column: 1; grid-row: 1; }
+  .pl-pane, .pl-blank { grid-column: 2; grid-row: 1; }
+  .pl-status { grid-column: 1 / -1; }
+}
+
+/* ---------- The library rail ---------- */
+.pl-side {
+  display: grid; gap: 0.9rem; align-content: start;
+  padding: 0.9rem; background: var(--bg-2);
+  border: 1px solid var(--line); border-radius: var(--r-lg);
+}
+/* Held in view beside a long playlist. Offset by the nav, which pins at
+   top: 0, the same arrangement the Vault's controls bar uses. */
+@media (min-width: 940px) {
+  .pl-side {
+    position: sticky; top: calc(var(--nav-h) + 1rem);
+    max-height: calc(100svh - var(--nav-h) - 2rem); overflow-y: auto;
+  }
+}
+
+.pl-side-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 0.75rem; padding-inline: 0.15rem;
+}
+.pl-side-n { font-size: var(--step--2); color: var(--faint); }
+
+.pl-list { display: grid; gap: 0.25rem; }
+.pl-card {
+  width: 100%; display: grid; gap: 0.7rem; align-items: center;
+  grid-template-columns: 46px minmax(0, 1fr);
+  text-align: left; padding: 0.45rem; border-radius: var(--r);
+  border: 1px solid transparent; background: transparent; color: inherit;
+  cursor: pointer;
+  transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.pl-card:hover { background: var(--bg-3); }
+.pl-card[aria-current="true"] {
+  background: var(--bg-3); border-color: var(--line-2);
+}
+
+.pl-card-art {
+  width: 46px; aspect-ratio: 1;
+  display: grid; gap: 1px;
+  grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+  border-radius: 9px; overflow: hidden; background: var(--bg);
+}
+.pl-card-art[data-n="0"],
+.pl-card-art[data-n="1"] { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+.pl-card-art[data-n="2"] { grid-template-rows: 1fr; }
+.pl-card-art[data-n="3"] .mos-cell:first-child { grid-row: span 2; }
+.pl-card-art .mos-mark { font-size: 0.82rem; }
+
+.pl-card-body { display: grid; gap: 0.12rem; min-width: 0; }
+.pl-card-name {
+  font-weight: 600; font-size: var(--step-0);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pl-card[aria-current="true"] .pl-card-name { color: var(--accent-2); }
+.pl-card-sub { display: flex; gap: 0.4rem; }
+.pl-card-n {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--step--2); color: var(--faint);
+}
+
+.pl-new { display: flex; gap: 0.4rem; }
+.pl-new-go { flex: none; width: 44px; padding-inline: 0; }
+.pl-new-go:hover svg { transform: none; }
+
+.pl-side-empty, .pl-backup-note {
+  color: var(--faint); font-size: var(--step--1); line-height: 1.6;
+}
+
+.pl-backup { display: grid; gap: 0.5rem; padding-top: 0.85rem; border-top: 1px solid var(--line); }
+.pl-backup-row { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+/* A <label> styled as a button, with the file input laid over it so the
+   whole pill is the hit target rather than the browser's own control. */
+.pl-file { position: relative; overflow: hidden; }
+.pl-file input {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  opacity: 0; cursor: pointer;
+}
+
+/* ---------- The edit panel ---------- */
+.pl-pane { display: grid; gap: 1rem; }
+.pl-form {
+  display: grid; gap: 1rem;
+  padding: 1rem; background: var(--bg-2);
+  border: 1px solid var(--line-2); border-radius: var(--r-lg);
+}
+.pl-form-fields { display: grid; gap: 0.3rem; }
+.pl-form-fields .pl-input + .lbl { margin-top: 0.6rem; }
+.pl-form-acts { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.pl-delete { margin-left: auto; color: var(--dim); }
+.pl-delete:hover { border-color: var(--c-cut); color: var(--c-cut); }
+.pl-delete.is-armed {
+  border-color: var(--c-cut); color: var(--c-cut);
+  background: rgba(251, 113, 133, 0.12);
+}
+
+/* ---------- The tracklist ---------- */
+.pl-rows-head, .pl-row {
+  display: grid; align-items: center; gap: 0.85rem;
+  grid-template-columns: 2.1rem 48px minmax(0, 1fr) 7.5rem 4rem 6.6rem;
+}
+.pl-rows-head {
+  padding: 0 0.75rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+  font-family: 'JetBrains Mono', monospace; font-size: var(--step--2);
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint);
+}
+.pl-h-pos { grid-column: 1; }
+.pl-h-title { grid-column: 3; }
+.pl-h-cat { grid-column: 4; }
+.pl-h-len { grid-column: 5; text-align: right; }
+
+.pl-rows { display: grid; gap: 1px; }
+.pl-row {
+  padding: 0.5rem 0.75rem; border-radius: var(--r);
+  transition: background-color var(--dur) var(--ease);
+}
+.pl-row:hover, .pl-row:focus-within { background: var(--bg-2); }
+
+.pl-pos { font-size: var(--step--2); color: var(--faint); }
+.pl-row:hover .pl-pos { color: var(--dim); }
+
+/* The generated cover marks are sized in cqi, so a thumbnail has to be
+   a container in its own right or they collapse to nothing. */
+.pl-shot { width: 48px; container-type: inline-size; }
+.pl-shot .cover { border-radius: 8px; }
+
+.pl-body { display: grid; gap: 0.1rem; min-width: 0; }
+.pl-title-t {
+  font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pl-row:hover .pl-title-t { color: var(--accent-2); }
+.pl-alts {
+  font-size: var(--step--2); color: var(--faint);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.pl-cat {
+  display: inline-flex; align-items: center; gap: 0.4rem; min-width: 0;
+  font-family: 'JetBrains Mono', monospace; font-size: var(--step--2);
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim);
+}
+.pl-cat .dot {
+  width: 7px; height: 7px; border-radius: 50%; flex: none;
+  background: var(--swatch, var(--accent));
+}
+.pl-len { font-size: var(--step--2); color: var(--dim); text-align: right; }
+
+/* Out of the way until the row is pointed at or tabbed into. They stay
+   in the tab order at opacity 0, and focus-within brings them back. */
+.pl-acts {
+  display: flex; gap: 0.25rem; justify-content: flex-end;
+  opacity: 0; transition: opacity var(--dur) var(--ease);
+}
+.pl-row:hover .pl-acts, .pl-row:focus-within .pl-acts { opacity: 1; }
+@media (hover: none) { .pl-acts { opacity: 1; } }
+
+.pl-act {
+  width: 32px; height: 32px; display: grid; place-items: center;
+  border-radius: 8px; border: 1px solid var(--line);
+  background: var(--bg-3); color: var(--dim); cursor: pointer;
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.pl-act svg { width: 15px; height: 15px; }
+.pl-act:hover:not(:disabled) { color: var(--text); border-color: var(--line-2); }
+.pl-act:disabled { opacity: 0.28; cursor: default; }
+.pl-act-cut:hover:not(:disabled) { color: var(--c-cut); border-color: var(--c-cut); }
+
+/* ---------- Empty states ---------- */
+.pl-rows-empty {
+  padding: 3rem 1.25rem; text-align: center;
+  color: var(--faint); font-size: var(--step--1); line-height: 1.7;
+  border: 1px dashed var(--line-2); border-radius: var(--r-lg);
+}
+
+.pl-blank {
+  display: grid; gap: 0.9rem; justify-items: start; align-content: start;
+  padding: clamp(1.5rem, 1rem + 2vw, 2.5rem);
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-lg);
+}
+.pl-blank-art {
+  width: 74px; aspect-ratio: 1; display: grid; place-items: center;
+  border-radius: var(--r); margin-bottom: 0.3rem;
+  background: linear-gradient(145deg, var(--bg-3), var(--bg));
+  border: 1px solid var(--line);
+}
+.pl-blank-mark {
+  font-family: 'Righteous', sans-serif; font-size: 1.5rem; color: var(--line-2);
+}
+.pl-blank h2 { font-family: 'Righteous', sans-serif; font-size: var(--step-2); }
+.pl-blank p { color: var(--faint); line-height: 1.7; max-width: 52ch; }
+
+.pl-status { color: var(--dim); font-size: var(--step--1); min-height: 1.3em; }
+
+@media (prefers-reduced-motion: reduce) {
+  .card-add { transition: none; }
+  .card-add:hover { transform: none; }
+  .pl-hero-art, .pl-hero-wash { transition: none; }
+  .pl-hero[data-mode="list"] .pl-hero-art { transform: none; }
+}
+
+/* ============================================================
    PHONES
    Everything above this point was written for wide screens and used
    unchanged below 760px, which is why small screens broke. These are
@@ -773,8 +1217,46 @@ img { display: block; max-width: 100%; }
   .lb-title { font-size: var(--step-2); margin-right: 2.75rem; }
   .lb-art { max-width: 190px; }
   .dl { grid-template-columns: 1fr; }
+  .lb-actions .btn { flex: 1 1 100%; }
 
   .foot { flex-direction: column; gap: 0.4rem; }
+
+  /* The add button is permanently visible here, so keep it small
+     enough not to cover the artwork it sits on */
+  .card-add { width: 28px; height: 28px; top: 0.3rem; right: 0.3rem; }
+  .card-add svg { width: 14px; height: 14px; }
+
+  /* The picker's field and its Create button stack: side by side the
+     field lost most of its width and the placeholder was unreadable.
+     The rail's own Create stays a square icon button and does not. */
+  .picker-new { flex-wrap: wrap; }
+  .picker-new .btn { flex: 1 1 100%; }
+
+  /* The art leads on a phone, so it centres above the type rather than
+     sitting in a column that is no longer there */
+  .pl-hero-in { justify-items: center; text-align: center; }
+  .pl-hero-art { width: min(62vw, 240px); }
+  .pl-lede, .pl-blank p { margin-inline: auto; }
+  .pl-figs { justify-content: center; }
+  .pl-hero-acts { justify-content: center; }
+  .pl-hero-acts .btn { flex: 1 1 100%; }
+
+  .pl-side { padding: 0.8rem; }
+  .pl-form { padding: 0.85rem; }
+  .pl-form-acts .btn { flex: 1 1 100%; }
+  .pl-delete { margin-left: 0; }
+
+  /* Category and length are dropped and the buttons take their own
+     row: at this width the title had about eight characters otherwise.
+     The category still reads from the row's cover and its dot. */
+  .pl-rows-head { display: none; }
+  .pl-row {
+    grid-template-columns: 1.9rem 44px minmax(0, 1fr);
+    gap: 0.6rem; padding: 0.45rem 0.5rem;
+  }
+  .pl-shot { width: 44px; }
+  .pl-cat, .pl-len { display: none; }
+  .pl-acts { grid-column: 1 / -1; justify-content: flex-end; }
 }
 
 /* ---------- Reduced motion ---------- */

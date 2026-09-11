@@ -19,6 +19,17 @@ export function seconds(len) {
   return parts.length === 2 ? parts[0] * 60 + parts[1] : 0;
 }
 
+/** 196 -> "3:16", 3766 -> "1:02:46". The inverse of `seconds`, widened
+    to hours, for the running time of a playlist. */
+export function clock(total) {
+  const whole = Math.max(0, Math.round(total || 0));
+  const h = Math.floor(whole / 3600);
+  const m = Math.floor((whole % 3600) / 60);
+  const s = whole % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return h ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+}
+
 /** "12.4 MB" -> 12400000. Used for sorting by size, so approximate is fine. */
 export function bytes(size) {
   const m = /([\d.]+)\s*(KB|MB|GB)/i.exec(size || '');

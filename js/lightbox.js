@@ -13,12 +13,24 @@ import { el, swatchFor } from './ui.js';
 /** The element that opened the panel, so focus can be handed back. */
 let lastFocus = null;
 
+/** The record currently on show, for the add-to-playlist button. */
+let current = null;
+
+/** What that button should call. Registered by app.js, which owns the
+    wiring, so this module stays unaware of where a track ends up. */
+let onAdd = null;
+
+export function setAddHandler(fn) {
+  onAdd = fn;
+}
+
 export function isOpen() {
   return !el.lightbox.hidden;
 }
 
 export function openLightbox(track, source) {
   lastFocus = source || document.activeElement;
+  current = track;
 
   applyCover(el.lbCover, track);
 
@@ -72,6 +84,7 @@ export function closeLightbox() {
 
   el.lightbox.hidden = true;
   document.body.style.overflow = '';
+  current = null;
 
   if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
   lastFocus = null;
@@ -95,6 +108,14 @@ export function trapTab(event) {
     event.preventDefault();
     first.focus();
   }
+}
+
+/* The panel stays open behind the picker, so the reader lands back on
+   the record they were looking at rather than on the grid. */
+if (el.lbAdd) {
+  el.lbAdd.addEventListener('click', () => {
+    if (current && onAdd) onAdd(current, el.lbAdd);
+  });
 }
 
 /* Dismiss by clicking the backdrop or the close button */
