@@ -1,21 +1,22 @@
-/.env
+/web/.env
 # Any variant too: a .env.bak or .env.local holding a bearer token must not
 # become the one file that leaks it.
-/.env.*
+/web/.env.*
 /CLAUDE.md
 
 # Saved cover images. Thousands of binaries that git would carry forever,
-# and `python tools/save-catalogue.py --covers` rebuilds them. The catalogue
-# itself stays tracked: it is the thing that makes the pages work offline.
-/data/covers/
+# and `python tools/save-catalogue.py --covers`, run from web/, rebuilds
+# them. The catalogue itself stays tracked: it is the thing that makes the
+# pages work offline.
+/web/data/covers/
 # Maps record id to cover hash. Describes the folder above, so it is useless
 # without it, and `--dedupe` rebuilds it from whatever is on disk.
-/data/covers-index.json
+/web/data/covers-index.json
 
 # Audio. Tens of gigabytes of somebody else's recordings, fetched by
-# tools/save-audio.py. This must never end up in a commit.
-/data/audio/
-/data/audio-index.json
+# web/tools/save-audio.py. This must never end up in a commit.
+/web/data/audio/
+/web/data/audio-index.json
 *.mp3
 *.wav
 *.m4a
