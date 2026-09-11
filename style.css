@@ -516,6 +516,22 @@ img { display: block; max-width: 100%; }
   border: 0; background: transparent; color: inherit; cursor: pointer;
 }
 .card-shot {
+  /* Block, and not by accident. This is a <span>, so it defaults to
+     inline, and an inline box is a poor containing block: the badges
+     inside it are absolutely positioned, and .cover is display: grid,
+     which splits the inline into empty zero-width fragments. The
+     badges then resolved their left/right against one of those rather
+     than against the artwork and landed a whole cell to the side, so
+     every card showed its neighbour's duration and the first card of
+     each row threw its own off the edge of the grid.
+
+     .pl-shot and .mini-shot never had this, because they are grid and
+     flex items and get blockified anyway. This one sits inside .card,
+     which is display: block, so it stayed inline.
+
+     It also lets aspect-ratio apply to .skeleton .card-shot below,
+     which was being dropped for the same reason. */
+  display: block;
   position: relative; border-radius: var(--r); overflow: hidden;
   box-shadow: 0 10px 30px -18px rgba(0,0,0,0.9);
 }
