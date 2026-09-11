@@ -76,6 +76,19 @@ function icon(d) {
   return svg;
 }
 
+/** The 999 mark, pointing at the sprite playlists.html carries near the
+    top of <body>. Colour and size come from whatever holds it. */
+function markSvg() {
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('class', 'mark');
+  svg.setAttribute('aria-hidden', 'true');
+
+  const use = document.createElementNS(NS, 'use');
+  use.setAttribute('href', '#mark999');
+  svg.appendChild(use);
+  return svg;
+}
+
 const UP = 'M12 19V5M5 12l7-7 7 7';
 const DOWN = 'M12 5v14M19 12l-7 7-7-7';
 const CROSS = 'M6 6l12 12M18 6L6 18';
@@ -122,7 +135,11 @@ function mosaic(node, rows) {
   });
 
   // Nothing saved yet: the 999 mark stands in for the artwork
-  if (!picks.length) node.appendChild(make('span', 'mos-mark', '999'));
+  if (!picks.length) {
+    const mark = make('span', 'mos-mark');
+    mark.appendChild(markSvg());
+    node.appendChild(mark);
+  }
 }
 
 /** The palette of a playlist's first cover, as [base, mid, detail]. */

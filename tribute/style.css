@@ -174,11 +174,28 @@ button { font: inherit; }
   font-family: 'Righteous', sans-serif; font-size: 1.1rem;
   text-decoration: none; letter-spacing: 0.02em;
 }
+/* ---------- The 999 mark ----------
+   This page shares no CSS with the rest of the site, so it carries its
+   own copy of these two. Same arrangement: a sprite parked off screen
+   near the top of <body>, referenced by <use>, with stroke inherited
+   from whatever holds it. Off screen rather than display: none, or an
+   unrendered SVG stops resolving and the mark disappears. */
+.mark-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+.mark {
+  display: block; flex: none;
+  height: 1em; width: calc(1em * 12 / 7);
+  stroke-width: 3.2;
+}
+
+/* The tile stays, because this page's nav is built around it. The three
+   typed nines inside it become the drawn mark, in white against the
+   gradient rather than carrying a gradient of their own. */
 .brand-mark {
   width: 34px; height: 34px; border-radius: 10px; flex: none;
-  display: grid; place-items: center; font-size: 0.78rem; letter-spacing: -0.03em;
+  display: grid; place-items: center;
   background: linear-gradient(140deg, var(--primary), var(--accent));
-  color: #fff;
+  font-size: 0.62rem; stroke: #fff;
 }
 .nav-links { display: none; gap: 0.25rem; align-items: center; }
 .nav-links a {
@@ -250,13 +267,15 @@ button { font: inherit; }
   bottom: -22%; left: -12%;
   background: radial-gradient(circle, rgba(236,72,153,0.32), transparent 68%);
 }
+/* The watermark behind the hero. Already an outline, so the mark maps
+   straight on: a hairline stroke, because at this size the mark's own
+   3.2 units would come out as a slab. */
 .hero-999 {
   position: absolute; inset: 0; display: grid; place-items: center; z-index: 0;
-  font-family: 'Righteous', sans-serif;
-  font-size: clamp(14rem, 42vw, 40rem); line-height: 1;
-  color: transparent;
-  -webkit-text-stroke: 2px rgba(139, 92, 246, 0.14);
+  font-size: clamp(9rem, 27vw, 26rem);
+  stroke: rgba(139, 92, 246, 0.14); stroke-width: 1.1;
   user-select: none; pointer-events: none;
+  overflow: hidden;
 }
 .hero .wrap { position: relative; z-index: var(--z-base); }
 .hero-title {

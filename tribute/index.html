@@ -8,17 +8,32 @@
   <title>999: A Juice WRLD Tribute</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
   <div class="grain" aria-hidden="true"></div>
 
+  <!-- The 999 mark, defined once and referenced by <use> below. Parked
+       off screen by .mark-defs rather than hidden: an SVG that is not
+       rendered stops resolving a gradient the mark could point at. -->
+  <svg class="mark-defs" aria-hidden="true" focusable="false">
+    <symbol id="mark999" viewBox="0 10 48 28" fill="none" stroke-linecap="round">
+      <circle cx="9.5" cy="19" r="5.5"/>
+      <path d="M15 19 V28.5 Q15 34.5 9 34.5"/>
+      <circle cx="24" cy="19" r="5.5"/>
+      <path d="M29.5 19 V28.5 Q29.5 34.5 23.5 34.5"/>
+      <circle cx="38.5" cy="19" r="5.5"/>
+      <path d="M44 19 V28.5 Q44 34.5 38 34.5"/>
+    </symbol>
+  </svg>
+
   <!-- ============ NAV ============ -->
   <header>
     <nav class="nav" id="nav" aria-label="Main">
       <a class="brand" href="#top">
-        <span class="brand-mark" aria-hidden="true">999</span>
+        <span class="brand-mark" aria-hidden="true"><svg class="mark"><use href="#mark999"/></svg></span>
         <span>Juice WRLD</span>
       </a>
 
@@ -63,7 +78,7 @@
     <!-- ============ HERO ============ -->
     <section class="hero" id="top">
       <div class="hero-bg" aria-hidden="true"></div>
-      <div class="hero-999" aria-hidden="true">999</div>
+      <div class="hero-999" aria-hidden="true"><svg class="mark"><use href="#mark999"/></svg></div>
 
       <div class="wrap">
         <p class="live-badge">
@@ -383,7 +398,7 @@
       <div class="footer-grid">
         <div>
           <a class="brand" href="#top" style="margin-bottom:1rem">
-            <span class="brand-mark" aria-hidden="true">999</span>
+            <span class="brand-mark" aria-hidden="true"><svg class="mark"><use href="#mark999"/></svg></span>
             <span>Juice WRLD</span>
           </a>
           <p style="color:var(--text-muted);font-size:var(--step--1)">

@@ -62,12 +62,13 @@
 }
 
 .home-title { display: grid; gap: 0.35rem; margin: 1rem 0 0; }
+/* The hero mark. Smaller numbers than the old type: this sizes the
+   drawn mark's full height, where a font size only sized its box and
+   the glyphs sat well inside it. */
 .home-title-mark {
-  font-family: 'Righteous', sans-serif;
-  font-size: clamp(4.5rem, 1rem + 15vw, 10.5rem);
-  line-height: 0.82; letter-spacing: -0.02em;
-  background: linear-gradient(160deg, #FFFFFF 18%, var(--accent-2) 62%, var(--accent) 100%);
-  -webkit-background-clip: text; background-clip: text; color: transparent;
+  display: block;
+  font-size: clamp(3rem, 0.7rem + 10vw, 7rem);
+  stroke: url(#mark-grad);
 }
 .home-title-rest {
   font-family: 'Righteous', sans-serif;
@@ -244,12 +245,12 @@
     radial-gradient(90% 120% at 50% 0%, rgba(134, 239, 172, 0.16), transparent 65%),
     var(--bg-3);
 }
+/* Already an outline before the mark existed, so it maps straight over:
+   a thinner stroke than the brand uses, in the released hue. */
 .home-card-art-999 span {
   position: relative; z-index: 3;
-  font-family: 'Righteous', sans-serif;
-  font-size: clamp(3rem, 2rem + 5vw, 5rem); line-height: 1;
-  color: transparent;
-  -webkit-text-stroke: 1.5px var(--c-released);
+  font-size: clamp(2.2rem, 1.4rem + 3.6vw, 3.6rem); line-height: 1;
+  stroke: var(--c-released); stroke-width: 2.2;
   opacity: 0.5;
   transition: opacity var(--dur) var(--ease);
 }

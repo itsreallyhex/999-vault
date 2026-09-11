@@ -21,5 +21,12 @@
 *.m4a
 *.flac
 
+# graphify's knowledge graph of this repo, written by /graphify. Derived
+# data, not source: it holds a second full copy of the extraction plus a
+# 360 KB graph.html, and `/graphify . --update` rebuilds it from the files
+# tracked here anyway. The cache/ and manifest.json inside it are what make
+# a re-run cheap, and they are machine-local by nature.
+/graphify-out/
+
 __pycache__/
 *.pyc

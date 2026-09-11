@@ -130,11 +130,34 @@ img { display: block; max-width: 100%; }
   display: inline-flex; align-items: baseline; gap: 0.6rem;
   text-decoration: none; color: inherit; margin-right: auto;
 }
+/* ---------- The 999 mark ----------
+   Three stroked nines, drawn rather than typed. Each page carries one
+   copy in a <svg class="mark-defs"> sprite near the top of <body> and
+   references it with <use href="#mark999">.
+
+   The sprite is moved off screen rather than given display: none: an
+   SVG that is not rendered stops resolving the gradient the mark's
+   stroke points at, in some engines, and the mark comes out invisible.
+
+   The shapes in the symbol carry no stroke of their own. stroke is an
+   inherited property, so it passes into the <use> shadow tree from
+   whatever context the mark sits in, and each place below sets it. */
+.mark-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* Height drives the mark and the width follows the 12:7 viewBox, so a
+   context only has to set font-size and a stroke. */
+/* stroke-width lives here rather than on the symbol, or a presentation
+   attribute inside the symbol would win over anything a context tries
+   to set and the weight could never be tuned per placement. */
+.mark {
+  display: block; flex: none;
+  height: 1em; width: calc(1em * 12 / 7);
+  stroke-width: 3.2;
+}
+
 .brand-mark {
-  font-family: 'Righteous', sans-serif; font-size: 1.5rem; line-height: 1;
-  letter-spacing: 0.01em;
-  background: linear-gradient(150deg, #FFFFFF 15%, var(--accent-2) 70%, var(--accent) 100%);
-  -webkit-background-clip: text; background-clip: text; color: transparent;
+  display: block; font-size: 1.2rem;
+  stroke: url(#mark-grad);
 }
 .brand-text {
   font-size: var(--step--1); color: var(--dim);
@@ -955,8 +978,7 @@ img { display: block; max-width: 100%; }
 
 .mos-mark {
   display: grid; place-items: center;
-  font-family: 'Righteous', sans-serif; font-size: 2.4rem;
-  color: var(--line-2); letter-spacing: 0.04em;
+  font-size: 2rem; stroke: var(--line-2);
 }
 
 /* ---------- Board ---------- */
@@ -1157,7 +1179,7 @@ img { display: block; max-width: 100%; }
   border: 1px solid var(--line);
 }
 .pl-blank-mark {
-  font-family: 'Righteous', sans-serif; font-size: 1.5rem; color: var(--line-2);
+  display: block; font-size: 1.5rem; stroke: var(--line-2);
 }
 .pl-blank h2 { font-family: 'Righteous', sans-serif; font-size: var(--step-2); }
 .pl-blank p { color: var(--faint); line-height: 1.7; max-width: 52ch; }
