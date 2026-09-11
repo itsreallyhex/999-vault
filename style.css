@@ -590,6 +590,9 @@ img { display: block; max-width: 100%; }
 .source[data-state="live"] { color: #86EFAC; }
 .source[data-state="offline"] .src-dot { background: #FBBF24; }
 .source[data-state="offline"] { color: #FCD34D; }
+/* Served from data/catalogue.json. Steady, not pinging: nothing is arriving. */
+.source[data-state="saved"] .src-dot { background: #60A5FA; }
+.source[data-state="saved"] { color: #93C5FD; }
 @keyframes ping {
   70% { box-shadow: 0 0 0 9px rgba(52,211,153,0); }
   100% { box-shadow: 0 0 0 0 rgba(52,211,153,0); }

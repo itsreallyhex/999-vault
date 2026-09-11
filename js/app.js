@@ -7,7 +7,7 @@
    ============================================================ */
 
 import { PAGE_SIZE, SEARCH_DELAY } from './config.js';
-import { seconds, bytes, group, debounce } from './utils.js';
+import { seconds, bytes, group, debounce, niceDate } from './utils.js';
 import { fetchCatalogue } from './api.js';
 import { buildAssignments } from './covers.js';
 import {
@@ -146,9 +146,18 @@ async function boot() {
   let sourceText;
 
   try {
-    tracks = await fetchCatalogue();
-    sourceState = 'live';
-    sourceText = `Live · ${group(tracks.length)} entries`;
+    const catalogue = await fetchCatalogue();
+    tracks = catalogue.tracks;
+
+    if (catalogue.source === 'saved') {
+      const when = catalogue.savedAt ? niceDate(catalogue.savedAt.slice(0, 10)) : '';
+      sourceState = 'saved';
+      sourceText = `Saved copy · ${group(tracks.length)} entries`
+        + (when ? ` · ${when}` : '');
+    } else {
+      sourceState = 'live';
+      sourceText = `Live · ${group(tracks.length)} entries`;
+    }
   } catch (err) {
     // Offline, or the archive is unreachable: fall back to the bundled sample
     tracks = SEED.map((r) => ({ ...r, a: r.a || [], cov: null }));

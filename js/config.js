@@ -12,6 +12,17 @@ export const API_BASE = 'https://api.juicevault.xyz';
     seed, in ms. The listing normally returns in under two seconds. */
 export const REQUEST_TIMEOUT = 12000;
 
+/** Saved copy of the catalogue, relative to js/. Written by
+    tools/save-catalogue.py and read before the network is touched at all,
+    so the pages keep working with the archive down. */
+export const SNAPSHOT_PATH = '../data/catalogue.json';
+
+/** How long to wait on the saved copy, in ms. It is a file on the same
+    server, so this is short on purpose: a missing or stalled snapshot
+    should hand over to the live request quickly, not sit on the full
+    REQUEST_TIMEOUT first. */
+export const SNAPSHOT_TIMEOUT = 4000;
+
 /** Cards appended per batch. The catalogue runs to a few thousand rows,
     so the grid fills progressively rather than all at once. */
 export const PAGE_SIZE = 60;

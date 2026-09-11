@@ -196,8 +196,10 @@ async function start() {
 
   let data;
   try {
-    data = await fetchCatalogue();
-    setSource('live', 'Live from the archive');
+    const catalogue = await fetchCatalogue();
+    data = catalogue.tracks;
+    if (catalogue.source === 'saved') setSource('saved', 'Saved copy');
+    else setSource('live', 'Live from the archive');
   } catch (err) {
     // No `cov` on the seed rows, so most of these fall through to a
     // generated cover rather than leaving an empty box.

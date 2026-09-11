@@ -1,2 +1,10 @@
 /.env
 /CLAUDE.md
+
+# Saved cover images. Thousands of binaries that git would carry forever,
+# and `python tools/save-catalogue.py --covers` rebuilds them. The catalogue
+# itself stays tracked: it is the thing that makes the pages work offline.
+/data/covers/
+
+__pycache__/
+*.pyc

@@ -101,6 +101,7 @@
 }
 .home-hero-note[data-state="live"] .home-hero-dot { background: var(--c-released); }
 .home-hero-note[data-state="offline"] .home-hero-dot { background: var(--c-stem); }
+.home-hero-note[data-state="saved"] .home-hero-dot { background: var(--c-remaster); }
 .home-hero-note[data-state="loading"] .home-hero-dot { animation: home-pulse 1.5s var(--ease) infinite; }
 
 @keyframes home-pulse { 50% { opacity: 0.25; } }
