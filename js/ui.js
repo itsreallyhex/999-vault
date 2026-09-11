@@ -25,6 +25,7 @@ export const el = {};
   'empty', 'heroFigs', 'stripTrack', 'source', 'sourceText', 'more', 'moreBtn',
   'moreCount', 'sentinel', 'lightbox', 'lbClose', 'lbCover', 'lbMark', 'lbImg',
   'lbCat', 'lbCatName', 'lbTitle', 'lbAlts', 'lbAltsEmpty', 'lbMeta', 'lbAdd',
+  'lbPlay',
   'picker', 'pickerShot', 'pickerTitle', 'pickerCat', 'pickerClose',
   'pickerList', 'pickerEmpty', 'pickerNew', 'pickerName', 'pickerNote'
 ].forEach((id) => { el[id] = document.getElementById(id); });
@@ -241,7 +242,22 @@ function plusIcon() {
   return svg;
 }
 
-function buildCard(track, onOpen, onAdd) {
+/** The triangle on a card's play button. Filled, not stroked: at 16px
+    an outlined triangle reads as a smudge. */
+function playIcon() {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'currentColor');
+  svg.setAttribute('aria-hidden', 'true');
+
+  const path = document.createElementNS(ns, 'path');
+  path.setAttribute('d', 'M8 5.14v13.72a1 1 0 0 0 1.5.86l11.14-6.86a1 1 0 0 0 0-1.72L9.5 4.28A1 1 0 0 0 8 5.14z');
+  svg.appendChild(path);
+  return svg;
+}
+
+function buildCard(track, onOpen, onAdd, onPlay) {
   const li = make('li', 'cell');
 
   const btn = make('button', 'card');
@@ -286,6 +302,18 @@ function buildCard(track, onOpen, onAdd) {
 
   li.appendChild(btn);
 
+  // Same reasoning as the add button below: a sibling, not a child.
+  // This one sits over the middle of the artwork rather than in a
+  // corner, because it is the action most likely to be wanted.
+  if (onPlay) {
+    const play = make('button', 'card-play');
+    play.type = 'button';
+    play.appendChild(playIcon());
+    play.appendChild(make('span', 'sr-only', `Play ${track.t}`));
+    play.addEventListener('click', () => onPlay(track, play));
+    li.appendChild(play);
+  }
+
   // A sibling of the card, not a child: the card is itself a <button>,
   // and a button inside a button is invalid and will not receive
   // clicks. The <li> is the positioning context that places it.
@@ -318,14 +346,15 @@ export function renderSkeleton() {
  * `list` is the full filtered set; only the first `shown` are built,
  * so the DOM never holds thousands of cards at once.
  *
- * `onAdd` is optional. Passing it puts an add-to-playlist button on
- * every card; leaving it out renders the grid exactly as before.
+ * `onAdd` and `onPlay` are both optional. Passing them puts an
+ * add-to-playlist button and a play button on every card; leaving
+ * them out renders the grid exactly as before.
  */
-export function renderGrid(list, shown, onOpen, onAdd) {
+export function renderGrid(list, shown, onOpen, onAdd, onPlay) {
   const batch = list.slice(0, shown);
 
   const frag = document.createDocumentFragment();
-  batch.forEach((track) => frag.appendChild(buildCard(track, onOpen, onAdd)));
+  batch.forEach((track) => frag.appendChild(buildCard(track, onOpen, onAdd, onPlay)));
 
   el.rows.textContent = '';
   el.rows.appendChild(frag);

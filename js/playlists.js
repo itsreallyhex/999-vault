@@ -21,6 +21,9 @@ import { make, niceDate, group, seconds, clock } from './utils.js';
 import { buildCover, buildAssignments, coverSpec } from './covers.js';
 import { swatchFor } from './ui.js';
 import {
+  initPlayer, playFromPlaylist, toggleShuffle, isShuffled
+} from './player.js';
+import {
   listPlaylists, createPlaylist, updatePlaylist, deletePlaylist,
   itemsIn, removeItem, moveItem, exportAll, importAll
 } from './db.js';
@@ -31,6 +34,7 @@ const el = {};
 [
   'plStatus', 'plHero', 'plHeroArt', 'plKind', 'plTitle', 'plLede', 'plStats',
   'plFigs', 'plFigLists', 'plFigTracks', 'plActs', 'plEditBtn',
+  'plPlay', 'plShuffle',
   'plSideN', 'plLists', 'plListsEmpty', 'plNewForm', 'plNewName',
   'plPane', 'plBlank', 'plForm', 'plName', 'plNoteField', 'plFormCancel',
   'plDelete', 'plRowsHead', 'plRows', 'plRowsEmpty', 'plExport', 'plImport'
@@ -75,6 +79,32 @@ function icon(d) {
 const UP = 'M12 19V5M5 12l7-7 7 7';
 const DOWN = 'M12 5v14M19 12l-7 7-7-7';
 const CROSS = 'M6 6l12 12M18 6L6 18';
+
+/** Filled, unlike the others: a stroked triangle at this size reads
+    as a smudge rather than a play button. */
+function playIcon() {
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'currentColor');
+  svg.setAttribute('aria-hidden', 'true');
+
+  const path = document.createElementNS(NS, 'path');
+  path.setAttribute('d', 'M8 5.14v13.72a1 1 0 0 0 1.5.86l11.14-6.86a1 1 0 0 0 0-1.72L9.5 4.28A1 1 0 0 0 8 5.14z');
+  svg.appendChild(path);
+  return svg;
+}
+
+/**
+ * Start the selected playlist at one row.
+ *
+ * The whole list goes to the player, not just the track, because the
+ * running order is the point of this context: it needs somewhere to
+ * advance to when the track ends.
+ */
+function playAt(index) {
+  if (!currentId || !items.length) return;
+  playFromPlaylist(currentId, items, index);
+}
 
 /* ---------- Cover mosaic ----------
    Up to four covers stacked into one square. The cell count goes on
@@ -136,6 +166,14 @@ function renderHero() {
   el.plStats.textContent = bits.join('  ·  ');
   el.plFigs.hidden = true;
   el.plActs.hidden = false;
+
+  // Nothing to play in an empty list, and the shuffle flag is the
+  // player's, so the button is drawn from it rather than from a
+  // second copy kept here.
+  el.plPlay.disabled = items.length === 0;
+  el.plShuffle.disabled = items.length === 0;
+  el.plShuffle.setAttribute('aria-pressed', String(isShuffled()));
+  el.plShuffle.classList.toggle('is-on', isShuffled());
 
   mosaic(el.plHeroArt, items);
 
@@ -209,6 +247,16 @@ function buildRow(item, index) {
 
   const shot = make('span', 'pl-shot');
   shot.appendChild(buildCover(item));
+
+  // Safe to nest here, unlike the Vault: a playlist row is an <li> of
+  // spans, not a <button>, so this is not a button inside a button.
+  const play = make('button', 'pl-play');
+  play.type = 'button';
+  play.appendChild(playIcon());
+  play.appendChild(make('span', 'sr-only', `Play ${item.t}`));
+  play.addEventListener('click', () => playAt(index));
+  shot.appendChild(play);
+
   li.appendChild(shot);
 
   const body = make('span', 'pl-body');
@@ -510,6 +558,18 @@ async function doImport(event) {
 }
 
 /* ---------- Events ---------- */
+/* Play from the top of the list, in whatever order shuffle has set */
+el.plPlay.addEventListener('click', () => playAt(0));
+
+/* Shuffle can be armed with nothing playing, so pressing it on a
+   stopped playlist sets the order and starts it. */
+el.plShuffle.addEventListener('click', () => {
+  const on = toggleShuffle();
+  el.plShuffle.setAttribute('aria-pressed', String(on));
+  el.plShuffle.classList.toggle('is-on', on);
+  if (on && items.length) playAt(0);
+});
+
 el.plNewForm.addEventListener('submit', makeList);
 el.plForm.addEventListener('submit', saveMeta);
 el.plEditBtn.addEventListener('click', toggleForm);
@@ -531,6 +591,10 @@ document.addEventListener('keydown', (event) => {
 
 /* ---------- Boot ---------- */
 async function boot() {
+  // Puts the bar back if a track was playing on the way in from the
+  // Vault. Not awaited: the rail should not wait on the audio index.
+  initPlayer();
+
   try {
     await refreshLists();
     if (currentId) await select(currentId); else renderPane();

@@ -41,6 +41,11 @@ export function toTrack(rec) {
     || 'Untitled';
 
   return {
+    // The archive's own record id. Named `rid` rather than `id`
+    // because a saved playlist item already has an `id` of its own,
+    // and db.js spreads this shape over the top of it. It is what
+    // player.js resolves an audio file through.
+    rid: rec.id || null,
     t: title,
     a: (rec.alt_names || []).filter((n) => n && n !== title),
     len: rec.length || '',

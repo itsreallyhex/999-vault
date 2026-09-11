@@ -14,8 +14,11 @@ import {
   el, setSource, renderHero, renderStrip, renderChips,
   renderSkeleton, renderGrid, renderCount
 } from './ui.js';
-import { openLightbox, closeLightbox, isOpen, trapTab, setAddHandler } from './lightbox.js';
+import {
+  openLightbox, closeLightbox, isOpen, trapTab, setAddHandler, setPlayHandler
+} from './lightbox.js';
 import { openPicker, isPickerOpen } from './picker.js';
+import { initPlayer, playTrack, setVaultPool } from './player.js';
 import { SEED } from './seed.js';
 
 /* ---------- State ---------- */
@@ -53,7 +56,7 @@ function visible() {
 function draw(reset) {
   if (reset) shown = PAGE_SIZE;
   const list = visible();
-  renderGrid(list, shown, openLightbox, openPicker);
+  renderGrid(list, shown, openLightbox, openPicker, playTrack);
   renderCount(list, state);
 }
 
@@ -104,6 +107,13 @@ el.sortSelect.addEventListener('change', () => {
 
 /* The picker is opened from a card and from inside the lightbox */
 setAddHandler(openPicker);
+setPlayHandler(playTrack);
+
+/* The player's random Next picks from whatever the grid is showing,
+   not from the whole catalogue. Handing it `visible` rather than the
+   list keeps the filter and sort owned here and re-read on every
+   pick, so a chip changed mid-track is honoured by the next one. */
+setVaultPool(visible);
 
 document.addEventListener('keydown', (event) => {
   // The picker is a native <dialog>: it closes itself on Escape and
@@ -167,6 +177,12 @@ async function boot() {
 
   data = tracks;
   buildAssignments(data);
+
+  // Warms the exclusion queue and puts back whatever the last page
+  // was playing. Not awaited: it reads IndexedDB and the audio index,
+  // and the grid should not wait on either.
+  initPlayer();
+
   setSource(sourceState, sourceText);
   renderHero(data);
   renderStrip(data);

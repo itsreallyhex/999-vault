@@ -5,10 +5,18 @@
    the only one that touches the network. No DOM, no fetch: it is
    handed plain track objects and returns plain objects back.
 
-   Two stores:
+   Three stores:
 
      playlists  { id, name, note, created, updated }
      items      { id, playlistId, pos, added, ...track snapshot }
+     recent     { id, at }
+
+   `recent` is the player's exclusion queue: the archive record ids
+   most recently started, newest last, capped at RECENT_CAP. The
+   Vault's random Next picks from outside it, so one session does not
+   keep handing back the same handful of tracks. It is keyed by the
+   record id, so replaying something refreshes its place rather than
+   spending a second slot on it.
 
    Items carry a copy of the track fields rather than a reference into
    the catalogue. That costs a little space and buys two things: a
@@ -26,13 +34,26 @@
    ============================================================ */
 
 const DB_NAME = '999-vault';
-const DB_VERSION = 1;
+/** 2 added the `recent` store. The upgrade only creates what is
+    missing, so a database written by version 1 keeps its playlists. */
+const DB_VERSION = 2;
 
 const PLAYLISTS = 'playlists';
 const ITEMS = 'items';
+const RECENT = 'recent';
 
-/** Fields copied from a track onto an item. Mirrors api.toTrack(). */
-const TRACK_KEYS = ['t', 'a', 'len', 'c', 'sz', 'p', 'd', 'se', 'cov'];
+/** How many record ids the exclusion queue holds before the oldest
+    falls off and becomes pickable again. */
+const RECENT_CAP = 200;
+
+/** Fields copied from a track onto an item. Mirrors api.toTrack().
+
+    `rid` is the archive's own record id, and it is called `rid` rather
+    than `id` on purpose: addTrack spreads this snapshot *after* the
+    item's `id: uid()`, so a key called `id` here would overwrite every
+    item's primary key. It is what the player resolves an audio file
+    through. */
+const TRACK_KEYS = ['rid', 't', 'a', 'len', 'c', 'sz', 'p', 'd', 'se', 'cov'];
 
 let dbPromise = null;
 
@@ -82,6 +103,13 @@ export function openDb() {
         // The repeat surfaces as a ConstraintError, caught in addTrack().
         items.createIndex('byPlaylistTitle', ['playlistId', 't'], { unique: true });
       }
+
+      if (!db.objectStoreNames.contains(RECENT)) {
+        const recent = db.createObjectStore(RECENT, { keyPath: 'id' });
+        // Ordered by when it was played, which is what makes the
+        // oldest-first trim a plain read of the first few keys.
+        recent.createIndex('byAt', 'at');
+      }
     };
 
     request.onsuccess = () => resolve(request.result);
@@ -129,6 +157,9 @@ function snapshot(track) {
   out.se = Boolean(track.se);
   out.p = track.p || 0;
   out.cov = track.cov || null;
+  // Null for rows saved before records carried an id. The player falls
+  // back to matching those by title, so they still play.
+  out.rid = track.rid || null;
   return out;
 }
 
@@ -348,6 +379,72 @@ export function membership(title) {
     tx.objectStore(ITEMS).index('byTitle').getAll(title).onsuccess = (event) => {
       done(event.target.result.map((r) => r.playlistId));
     };
+  });
+}
+
+/* ---------- Recently played ---------- */
+
+/**
+ * A strictly increasing timestamp.
+ *
+ * Date.now() alone is not enough: two tracks started inside the same
+ * millisecond, which a held-down Next does, get equal `at` values, and
+ * an IndexedDB index with equal keys falls back to primary key order.
+ * That is alphabetical by record id, so the queue would evict and
+ * reorder by id rather than by when things were played. Nudging
+ * forward by a millisecond keeps the order honest and stays within a
+ * millisecond of the wall clock.
+ */
+let lastAt = 0;
+
+function stamp() {
+  const now = Date.now();
+  lastAt = now > lastAt ? now : lastAt + 1;
+  return lastAt;
+}
+
+/**
+ * Record that a track was started, and trim the queue back to cap.
+ *
+ * Keyed by the record id, so a repeat refreshes that entry's place in
+ * the order instead of taking a second slot: the queue holds 200
+ * distinct tracks rather than 200 entries, which is what the Vault's
+ * random Next actually wants to exclude.
+ *
+ * The trim reads keys through `byAt`, which hands them back oldest
+ * first, and deletes however many are over. Both requests are queued
+ * on the same transaction, so the read already sees the write above it.
+ */
+export function pushRecent(rid, cap = RECENT_CAP) {
+  if (!rid) return Promise.resolve(false);
+
+  return run([RECENT], 'readwrite', (tx, done) => {
+    const store = tx.objectStore(RECENT);
+    store.put({ id: rid, at: stamp() });
+
+    store.index('byAt').getAllKeys().onsuccess = (event) => {
+      const keys = event.target.result;
+      for (let i = 0; i < keys.length - cap; i++) store.delete(keys[i]);
+      done(true);
+    };
+  });
+}
+
+/** Every id in the queue, oldest first. The player mirrors this into a
+    Set at boot so a random pick needs no database read. */
+export function recentIds() {
+  return run([RECENT], 'readonly', (tx, done) => {
+    tx.objectStore(RECENT).index('byAt').getAllKeys().onsuccess = (event) => {
+      done(event.target.result);
+    };
+  });
+}
+
+/** Empty the queue, so everything is eligible again. */
+export function clearRecent() {
+  return run([RECENT], 'readwrite', (tx, done) => {
+    tx.objectStore(RECENT).clear();
+    done(true);
   });
 }
 

@@ -24,6 +24,14 @@ export function setAddHandler(fn) {
   onAdd = fn;
 }
 
+/** The same arrangement for the play button: app.js owns the wiring,
+    so this module stays unaware of what plays a track. */
+let onPlay = null;
+
+export function setPlayHandler(fn) {
+  onPlay = fn;
+}
+
 export function isOpen() {
   return !el.lightbox.hidden;
 }
@@ -115,6 +123,15 @@ export function trapTab(event) {
 if (el.lbAdd) {
   el.lbAdd.addEventListener('click', () => {
     if (current && onAdd) onAdd(current, el.lbAdd);
+  });
+}
+
+/* Play leaves the panel open too. The bar is fixed to the bottom of
+   the viewport, so it is visible underneath either way, and closing
+   the panel would lose the record the reader was reading. */
+if (el.lbPlay) {
+  el.lbPlay.addEventListener('click', () => {
+    if (current && onPlay) onPlay(current, el.lbPlay);
   });
 }
 
