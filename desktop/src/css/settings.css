@@ -1,0 +1,120 @@
+/* ============================================================
+   Settings page. Layers on app.css for the tokens, the nav, .btn,
+   .label and .mono; player.css for the bar. Everything here is
+   set- prefixed, plus the two controls (.seg, .switch) that no other
+   page has.
+   ============================================================ */
+
+.set {
+  max-width: 880px;
+  margin-inline: auto;
+  padding-block: clamp(1.5rem, 1rem + 2vw, 3rem) 4rem;
+}
+
+.set-head { margin-bottom: 2rem; }
+.set-title {
+  font-family: 'Righteous', 'Poppins', sans-serif;
+  font-size: clamp(1.8rem, 1.1rem + 3vw, 3rem);
+  line-height: 1; letter-spacing: -0.02em;
+  margin: 0.4rem 0 0;
+  background: linear-gradient(135deg, #fff 0%, var(--accent-2) 60%, var(--accent) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.set-lede { margin: 0.7rem 0 0; color: var(--dim); line-height: 1.6; max-width: 52ch; }
+
+/* ---------- Groups and rows ---------- */
+.set-group {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--bg-2);
+  padding: 1.1rem 1.25rem 1.25rem;
+  margin-bottom: 1rem;
+}
+.set-group > .label { margin: 0 0 0.6rem; }
+
+.set-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem 2rem;
+  align-items: start;
+  padding-block: 0.9rem;
+  border-top: 1px solid var(--line);
+}
+.set-row:first-of-type { border-top: 0; }
+
+.set-name { margin: 0; font-weight: 600; }
+.set-desc { margin: 0.3rem 0 0; color: var(--dim); font-size: var(--step--1); line-height: 1.6; max-width: 48ch; }
+.set-path {
+  margin: 0.6rem 0 0; font-size: var(--step--1); color: var(--text);
+  overflow-wrap: anywhere;
+}
+.set-found { margin: 0.25rem 0 0; color: var(--faint); font-size: var(--step--2); }
+
+.set-note { margin: 0.8rem 0 0; color: var(--faint); font-size: var(--step--2); line-height: 1.6; }
+.set-note .mono { color: var(--dim); overflow-wrap: anywhere; }
+
+.set-btns { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.set-status { margin: 0.5rem 0 0; min-height: 1.4em; color: var(--faint); font-size: var(--step--2); }
+.set-status[data-state="bad"] { color: var(--c-cut); }
+
+/* ---------- The two-way choice ----------
+   Two stacked cards, the chosen one lit in the accent. The radio is
+   still a radio (keyboard, screen readers), just not drawn. */
+.seg { display: grid; gap: 0.5rem; min-width: min(360px, 100%); }
+.seg-opt { position: relative; display: block; cursor: pointer; }
+.seg-opt input {
+  position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer;
+}
+.seg-body {
+  display: block;
+  padding: 0.7rem 0.9rem 0.75rem 2.3rem;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  background: var(--bg-3);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.seg-body::before {
+  content: '';
+  position: absolute; left: 0.9rem; top: 0.95rem;
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--faint);
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.seg-name { display: block; font-weight: 600; font-size: var(--step-0); }
+.seg-note { display: block; margin-top: 0.15rem; color: var(--dim); font-size: var(--step--2); line-height: 1.5; }
+.seg-opt:hover .seg-body { border-color: var(--accent-2); }
+.seg-opt input:checked + .seg-body {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-3));
+}
+.seg-opt input:checked + .seg-body::before {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 3px var(--bg-3), inset 0 0 0 8px var(--accent);
+}
+.seg-opt input:focus-visible + .seg-body { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+
+/* ---------- The switch ---------- */
+.switch { display: inline-flex; align-items: center; gap: 0.7rem; cursor: pointer; user-select: none; }
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch-track {
+  position: relative; width: 44px; height: 26px; border-radius: 13px;
+  background: var(--line-2);
+  transition: background var(--dur) var(--ease);
+}
+.switch-knob {
+  position: absolute; top: 3px; left: 3px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--text);
+  transition: transform var(--dur) var(--ease);
+}
+.switch input:checked + .switch-track { background: var(--accent); }
+.switch input:checked + .switch-track .switch-knob { transform: translateX(18px); }
+.switch input:focus-visible + .switch-track { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+.switch-word { min-width: 2.2em; color: var(--dim); font-size: var(--step--1); }
+
+/* ---------- Narrow ---------- */
+@media (max-width: 600px) {
+  .set-row { grid-template-columns: 1fr; }
+  .set-btns { flex-direction: row; flex-wrap: wrap; }
+}

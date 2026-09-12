@@ -127,6 +127,12 @@ fn drop_client(presence: &Presence) {
 /// Show something. `false` means Discord is not there; nothing to do.
 #[tauri::command]
 pub fn presence_set(app: AppHandle, presence: State<Presence>, shown: Shown) -> Result<bool, String> {
+    // Switched off in Settings: nothing reaches the pipe, whatever the
+    // frontend sends. The frontend stops sending too, but this is the
+    // one that cannot be forgotten.
+    if !crate::settings::discord_on(&app) {
+        return Ok(false);
+    }
     if ensure(&app, &presence).is_err() {
         return Ok(false);
     }
@@ -205,6 +211,7 @@ pub fn presence_info(app: AppHandle, presence: State<Presence>) -> Info {
 /// What to print at startup.
 pub fn describe(app: &AppHandle) -> String {
     match client_id(app) {
+        Some(_) if !crate::settings::discord_on(app) => "off (Settings)".into(),
         Some(id) => format!("client id {}", id),
         None => "no client id. Set discord_client_id in the config file, or NINE_DISCORD_ID.".into(),
     }

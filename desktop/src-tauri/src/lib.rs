@@ -12,6 +12,7 @@ mod data;
 mod pages;
 mod paths;
 mod presence;
+mod settings;
 mod tools;
 
 /// Build the app and run it. main.rs is a one-line wrapper around this.
@@ -59,6 +60,7 @@ pub fn run() {
             }
 
             println!("999: discord   {}", presence::describe(&handle));
+            println!("999: source    {} first", settings::source(&handle));
 
             // The window is made here, not declared in tauri.conf.json.
             // A declared window resolves its page against devUrl in a
@@ -88,6 +90,9 @@ pub fn run() {
             presence::presence_set,
             presence::presence_clear,
             presence::presence_info,
+            settings::settings_get,
+            settings::settings_set,
+            settings::pick_folder,
         ])
         .run(tauri::generate_context!())
         .expect("999 failed to start");

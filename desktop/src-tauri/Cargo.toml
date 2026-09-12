@@ -21,6 +21,12 @@ tauri-plugin-shell = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.8"
+# Writing a setting back into config.toml without losing the comments
+# the template put there. `toml` alone would flatten the file.
+toml_edit = "0.22"
+# The native folder picker behind Settings > Data folder. Called from
+# an async command so its blocking dialog never sits on the main thread.
+rfd = "0.15"
 # Discord Rich Presence over the local IPC pipe. Pure Rust, no native
 # blob; a missing Discord is an ordinary connect error. See presence.rs.
 discord-rich-presence = "1"

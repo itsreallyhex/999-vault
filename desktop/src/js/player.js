@@ -193,9 +193,32 @@ function clearApiTimer() {
   apiTimer = null;
 }
 
-/** The archive did not deliver: no file here, and no stream either. */
+/** Whether the current load meant to play. apiFailed() needs it to
+    know whether to start the fallback file or leave it paused. */
+let wantPlay = true;
+
+/** The archive did not deliver. With the file on disk (stream-first
+    mode, since local-first never streams a track it has) carry on from
+    that, picking up where the stream got to; otherwise the missing
+    state, and never a bar that looks like it is about to play. */
 function apiFailed(reason) {
   clearApiTimer();
+
+  const local = state.track ? srcFor(state.track) : null;
+  if (local) {
+    const at = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+    state.source = 'local';
+    audio.src = local;
+    if (at > 0) {
+      audio.addEventListener('loadedmetadata', () => { audio.currentTime = at; }, { once: true });
+    }
+    paintOrigin();
+    ui.status.textContent = `${state.track.t}: the archive did not answer, playing the saved file`;
+    notify();
+    if (wantPlay) audio.play().catch(() => {});
+    return;
+  }
+
   audio.pause();
   audio.removeAttribute('src');
   ui.bar.classList.add('is-missing');
@@ -204,6 +227,50 @@ function apiFailed(reason) {
   ui.sub.textContent = reason;
   if (state.track) ui.status.textContent = `${state.track.t}: ${reason}`;
   paintPlaying(false);
+}
+
+/* ---------- Settings ----------
+   What the Settings page changes, mirrored here so load() and
+   presenceSync() do not ask Rust on every call. Loaded once in
+   initPlayer() from settings_get; the page calls applySettings() when
+   it saves, which lands on the host under the shell. Defaults match
+   the Rust side: local first, Discord on. */
+
+const prefs = {
+  /** 'local': the file if there is one, else the stream. 'stream':
+      the archive, and the file only if the archive fails. */
+  source: 'local',
+  discord: true
+};
+
+function loadSettings() {
+  if (!inTauri) return Promise.resolve();
+  return invoke('settings_get')
+    .then((s) => applySettings({ source: s.source, discord: s.discord }))
+    .catch(() => { /* not under Tauri, or no config: defaults stand */ });
+}
+
+/** Take new values. Source applies from the next load; Discord off
+    clears the presence now. */
+export function applySettings(next = {}) {
+  if (HOST) { HOST.applySettings(next); return; }
+  if (next.source === 'local' || next.source === 'stream') prefs.source = next.source;
+  if (typeof next.discord === 'boolean') {
+    const was = prefs.discord;
+    prefs.discord = next.discord;
+    if (was && !next.discord && inTauri) {
+      clearTimeout(presenceTimer);
+      presenceTimer = null;
+      invoke('presence_clear').catch(() => {});
+    }
+    if (!was && next.discord) presenceSync();
+  }
+}
+
+/** A copy, for the page to draw. */
+export function settings() {
+  if (HOST) return HOST.settings();
+  return { ...prefs };
 }
 
 /* ---------- State ---------- */
@@ -441,7 +508,7 @@ function presencePush() {
 
 /** Ask for an update soon. Repeated asks collapse into one. */
 function presenceSync() {
-  if (!inTauri || HOST) return;
+  if (!inTauri || HOST || !prefs.discord) return;
   clearTimeout(presenceTimer);
   presenceTimer = setTimeout(presencePush, PRESENCE_WAIT);
 }
@@ -836,8 +903,13 @@ function randomTrack() {
   let pool;
   try {
     const all = vaultPool();
-    pool = all.filter(hasAudio);
-    if (!pool.length) pool = all.filter((t) => t && t.rid);
+    const streamable = all.filter((t) => t && t.rid);
+    if (prefs.source === 'stream') {
+      pool = streamable;
+    } else {
+      pool = all.filter(hasAudio);
+      if (!pool.length) pool = streamable;
+    }
   } catch { pool = []; }
   if (!pool.length) return null;
 
@@ -879,13 +951,16 @@ async function load(track, { autoplay = true, at = 0, resumeId = null } = {}) {
   lastPos = at > 0 ? at : 0;
   unflushed = 0;
 
-  // The file on disk first, always. The archive's stream is only ever a
-  // fallback for a track that was never pulled, and it must not be
-  // preferred for one that was.
+  // Which of the two comes first is the `source` setting. Local first
+  // is the default: the file if there is one, the stream only for a
+  // track that was never pulled. Stream first is the opposite, and the
+  // file is then what apiFailed() falls back to.
   const local = srcFor(track);
-  const src = local || apiSrcFor(track);
-  state.source = local ? 'local' : (src ? 'api' : null);
+  const stream = apiSrcFor(track);
+  const src = prefs.source === 'stream' ? (stream || local) : (local || stream);
+  state.source = src ? (src === stream ? 'api' : 'local') : null;
   state.track = track;
+  wantPlay = autoplay;
 
   mount();
   ui.bar.hidden = false;
@@ -1409,5 +1484,5 @@ export function initPlayer() {
   if (HOST) return Promise.resolve();
   mount();
   loadIndex();
-  return loadRecent().then(restore);
+  return loadSettings().then(loadRecent).then(restore);
 }

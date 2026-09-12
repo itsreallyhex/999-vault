@@ -70,6 +70,18 @@ data_root = ""
 tools_dir = ""
 pages_dir = ""
 discord_client_id = ""
+
+# The two below are what the Settings page in the app changes. They
+# can be edited here just the same.
+#
+# source is "local" to play the file on disk and stream from the
+# archive only when there is none, or "stream" to play from the
+# archive and fall back to the file if the archive fails.
+#
+# discord is false to keep the "Listening to" status off Discord.
+
+source = "local"
+discord = true
 "#;
 
 /// What the frontend is told about the archive.

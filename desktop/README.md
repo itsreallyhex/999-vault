@@ -49,16 +49,17 @@ winning:
 4. A `data` folder in the OS app data directory.
 5. `web/data` in a checkout above the exe.
 
-The config file is `%APPDATA%\xyz.juicevault.nine\config.toml`, written as a
-commented template on first run. Use forward slashes and single quotes:
+The Settings page sets the folder for you. The same value can be typed
+into `%APPDATA%\xyz.juicevault.nine\config.toml`, written as a commented
+template on first run, with forward slashes and single quotes:
 
 ```toml
 data_root = 'D:/Random coding/juiceapi/web/data'
 pages_dir = 'D:/Random coding/juiceapi/desktop/src'
-discord_client_id = "..."
 ```
 
-The app prints what it resolved, and which rule answered, on startup.
+The app prints what it resolved, and which rule answered, on startup. The
+Settings page shows the same.
 
 ## What it does
 
@@ -78,6 +79,14 @@ it.
 **The player** lives outside the pages, so switching tabs does not stop the
 music.
 
+**Settings**, from the nav, for the things a person would otherwise have to
+edit in a file: whether songs come from the files on this machine first or
+from the archive first (local first is the default; stream first plays from
+the archive and falls back to the file if the archive fails), whether
+Discord is told what is playing, and which folder the archive is in, with a
+folder picker. Changes save as you make them. A folder change is picked up
+the next time the app opens.
+
 **Discord** shows what is playing while the app is open and Discord is
 running. Three states:
 
@@ -94,8 +103,8 @@ Paused: "Paused" and a timer counting up from the pause.
 ![Paused](../Assets/DiscordRPC(Paused).png)
 
 Stopping, or a track ending, clears it. The cover comes from the archive's
-CDN because Discord fetches it from its own servers. The client id goes in
-`config.toml` as `discord_client_id`.
+CDN because Discord fetches it from its own servers. Turn it off in
+Settings.
 
 ## Files
 
@@ -105,6 +114,7 @@ src/
   index.html      The overview.
   vault.html
   playlists.html
+  settings.html
   js/tauri.js     The only module that talks to Rust.
   js/player.js    The only module that owns an audio element.
 src-tauri/src/
@@ -112,6 +122,7 @@ src-tauri/src/
   data.rs         The archive folder and its JSON indexes.
   pages.rs        Serves src/ off disk.
   presence.rs     Discord.
+  settings.rs     Reads and writes the settings in config.toml.
   tools.rs        Runs the Python scripts in web/tools.
 ```
 
