@@ -30,6 +30,7 @@
    the state is rebuilt on the other side instead.
    ============================================================ */
 
+import { API_BASE } from './config.js';
 import { invoke, loadArchive, resolveAudio } from './tauri.js';
 import { make, clock } from './utils.js';
 import { buildCover, coverSpec } from './covers.js';
@@ -136,6 +137,52 @@ function srcFor(track) {
   return rid ? resolveAudio(byId.get(rid)) : null;
 }
 
+/**
+ * The archive's own stream for a track, for when there is no file here.
+ *
+ * `/music/stream/<id>` is a plain, stable, unsigned URL: 206 on a Range
+ * request, CORS reflects the origin, no token, no cookie, and a request
+ * to it leaves the download allowance untouched, which is what makes it
+ * the right endpoint for playback and the wrong one for the archiver.
+ * `/music/download/` is the metered one, at 500 a day anonymous, and it
+ * sends a Content-Disposition and 500s on three records. Do not switch
+ * this to it.
+ *
+ * Needs the record id, so a playlist row saved before `rid` existed
+ * cannot use this and lands in the plain missing state.
+ */
+function apiSrcFor(track) {
+  return track && track.rid
+    ? `${API_BASE}/music/stream/${encodeURIComponent(track.rid)}`
+    : null;
+}
+
+/** How long to wait on the archive before calling a stream dead. The
+    element fires `error` on a 404 or a refused connection, but a
+    connection that hangs never settles on its own, and a bar that says
+    a track is playing while nothing arrives is the one state this must
+    never end in. */
+const API_TIMEOUT = 20000;
+let apiTimer = null;
+
+function clearApiTimer() {
+  if (apiTimer) clearTimeout(apiTimer);
+  apiTimer = null;
+}
+
+/** The archive did not deliver: no file here, and no stream either. */
+function apiFailed(reason) {
+  clearApiTimer();
+  audio.pause();
+  audio.removeAttribute('src');
+  ui.bar.classList.add('is-missing');
+  ui.range.disabled = true;
+  ui.origin.hidden = true;
+  ui.sub.textContent = reason;
+  if (state.track) ui.status.textContent = `${state.track.t}: ${reason}`;
+  paintPlaying(false);
+}
+
 /* ---------- State ---------- */
 
 const state = {
@@ -152,7 +199,10 @@ const state = {
   shuffle: false,
   repeat: 'off',
   /** Vault context only: tracks already played, newest last. */
-  history: []
+  history: [],
+  /** 'local' for a file on this machine, 'api' for the archive's stream,
+      null when there is neither. Drives the visible label in the bar. */
+  source: null
 };
 
 /** The 200 most recent ids, mirrored in memory so a random pick does
@@ -273,8 +323,13 @@ function mount() {
   const text = make('span', 'mini-text');
   ui.title = make('span', 'mini-title');
   ui.sub = make('span', 'mini-sub');
+  // Plain text, not an icon: it has to be obvious at a glance that this
+  // track is coming over the network rather than from disk.
+  ui.origin = make('span', 'mini-origin', 'via API');
+  ui.origin.hidden = true;
   text.appendChild(ui.title);
   text.appendChild(ui.sub);
+  text.appendChild(ui.origin);
   who.appendChild(text);
 
   // Three bars that move while the audio does. Purely a state cue,
@@ -408,6 +463,12 @@ function paintTimes() {
 }
 
 /** Draw the identity half: artwork, title, category, and the wash. */
+/** Show the "via API" label only while the archive is the source. */
+function paintOrigin() {
+  if (!ui.origin) return;
+  ui.origin.hidden = state.source !== 'api';
+}
+
 function paintTrack() {
   const track = state.track;
   if (!track) return;
@@ -433,7 +494,9 @@ function paintTrack() {
   ui.bar.style.setProperty('--wash', pal[1]);
   ui.bar.style.setProperty('--wash-2', pal[2]);
 
-  ui.status.textContent = `Playing ${track.t}`;
+  ui.status.textContent = state.source === 'api'
+    ? `Playing ${track.t} from the archive, not from this machine`
+    : `Playing ${track.t}`;
   setMediaSession(track);
 }
 
@@ -577,8 +640,14 @@ function randomTrack() {
  */
 async function load(track, { autoplay = true, at = 0 } = {}) {
   await loadIndex();
+  clearApiTimer();
 
-  const src = srcFor(track);
+  // The file on disk first, always. The archive's stream is only ever a
+  // fallback for a track that was never pulled, and it must not be
+  // preferred for one that was.
+  const local = srcFor(track);
+  const src = local || apiSrcFor(track);
+  state.source = local ? 'local' : (src ? 'api' : null);
   state.track = track;
 
   mount();
@@ -586,6 +655,7 @@ async function load(track, { autoplay = true, at = 0 } = {}) {
   document.body.classList.add('has-player');
   paintTrack();
   paintContext();
+  paintOrigin();
 
   if (!src) {
     audio.pause();
@@ -603,6 +673,16 @@ async function load(track, { autoplay = true, at = 0 } = {}) {
   ui.range.value = '0';
   fill(ui.range);
   audio.src = src;
+
+  if (state.source === 'api') {
+    // A 404 or a dead network fires `error` and is handled there. This
+    // is for the connection that neither answers nor fails.
+    apiTimer = setTimeout(() => {
+      if (state.source === 'api' && audio.readyState < 1) {
+        apiFailed('The archive did not answer');
+      }
+    }, API_TIMEOUT);
+  }
 
   if (at > 0) {
     // currentTime set before metadata is discarded, so wait until the
@@ -789,10 +869,13 @@ export function stop() {
   // it. It fires an error event with no source, which the handler
   // below already stands aside for.
   audio.load();
+  clearApiTimer();
   state.track = null;
+  state.source = null;
   state.history = [];
   if (mounted) {
     ui.bar.hidden = true;
+    paintOrigin();
     paintPlaying(false);
   }
   document.body.classList.remove('has-player');
@@ -961,6 +1044,7 @@ function wire() {
   });
 
   audio.addEventListener('loadedmetadata', () => {
+    clearApiTimer();
     paintTimes();
     ui.range.disabled = !(Number.isFinite(audio.duration) && audio.duration > 0);
   });
@@ -1002,6 +1086,15 @@ function wire() {
   audio.addEventListener('error', () => {
     // stop() clears the source on purpose, and that fires this too
     if (!audio.getAttribute('src')) return;
+
+    if (state.source === 'api') {
+      // No file here, and the archive said no, or could not be reached,
+      // or the id is not one it knows. Same end state either way, and
+      // never a bar that looks like it is about to play.
+      apiFailed('Not saved here, and the archive could not stream it');
+      return;
+    }
+
     ui.bar.classList.add('is-missing');
     ui.sub.textContent = 'That file would not play';
     paintPlaying(false);

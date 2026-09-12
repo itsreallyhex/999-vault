@@ -296,6 +296,21 @@ body.has-player { padding-bottom: calc(var(--mini-h) + 0.5rem); }
 .mini.is-missing .mini-sub { color: var(--c-cut); }
 .mini.is-missing .mini-play { background: var(--bg-3); color: var(--faint); }
 
+/* The "via API" label. Visible text on purpose: an icon would be missed,
+   and the point is that it cannot be. Hidden by the [hidden] rule in
+   app.css whenever the source is the disk. */
+.mini-origin {
+  align-self: flex-start;
+  margin-top: 0.1rem;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+  font-size: var(--step--2); letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--accent-2);
+  white-space: nowrap;
+}
+
 /* ============================================================
    Focus
    ============================================================ */
