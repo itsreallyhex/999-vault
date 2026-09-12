@@ -375,9 +375,12 @@ export function sameTrack(a, b) {
    What the bar shows, on the owner's Discord profile too. Rust carries
    it down the local pipe (presence.rs); this decides what goes.
 
-   Playing: the title, "Juice WRLD · category [· n of m]", the cover,
-   and start plus end timestamps so Discord draws its bar with elapsed
-   and total. Paused: no end, the start set to the moment of the pause,
+   Playing: the title, "Juice WRLD", the cover, and start plus end
+   timestamps so Discord draws its bar with elapsed and total. With
+   repeat-one on, the second line reads "Juice WRLD · On repeat". The
+   category and the playlist position used to be on that line and were
+   taken off at the owner's request: where a track came from is not
+   something a profile needs to say. Paused: no end, the start set to the moment of the pause,
    and the second line "Paused", so Discord shows a timer counting up
    from when it stopped. Nothing loaded, or the track ended: cleared.
 
@@ -414,11 +417,7 @@ function presenceShown() {
     return shown;
   }
 
-  const bits = ['Juice WRLD', track.c];
-  if (state.context === 'playlist' && state.list.length) {
-    bits.push(`${state.cursor + 1} of ${state.list.length}`);
-  }
-  shown.line = bits.join(' · ');
+  shown.line = state.repeat === 'one' ? 'Juice WRLD · On repeat' : 'Juice WRLD';
 
   const pos = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
   shown.start = now - Math.floor(pos);
@@ -1098,6 +1097,8 @@ export function cycleRepeat() {
   ui.repeat.setAttribute('aria-label', `Repeat: ${state.repeat}`);
   ui.repeat.classList.toggle('is-on', state.repeat !== 'off');
   ui.status.textContent = `Repeat ${state.repeat}`;
+  // Discord's line says "On repeat" for repeat-one, so it changes here.
+  presenceSync();
 }
 
 /** Stop and put the bar away. The audio is released, not just paused. */
