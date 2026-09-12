@@ -36,13 +36,13 @@ pub struct DataRoot {
     pub audio_index: bool,
 }
 
-/// Strip the \?\ verbatim prefix Windows canonicalisation adds.
+/// Strip the \\?\ verbatim prefix Windows canonicalisation adds.
 ///
 /// It has to go: convertFileSrc turns the path into an asset URL, and the
 /// webview will not load one built from a verbatim path.
 fn tidy(path: PathBuf) -> PathBuf {
     let text = path.to_string_lossy().to_string();
-    match text.strip_prefix(r"\?\") {
+    match text.strip_prefix(r"\\?\") {
         Some(rest) => PathBuf::from(rest),
         None => path,
     }

@@ -68,8 +68,8 @@ export function loadArchive() {
 
 /** Join path parts with whatever separator the root came back using. */
 function join(...parts) {
-  const sep = root && root.path.includes('\') ? '\' : '/';
-  return parts.join(sep).replace(/[\/]+/g, sep);
+  const sep = root && root.path.includes('\\') ? '\\' : '/';
+  return parts.join(sep).replace(/[\\/]+/g, sep);
 }
 
 /**
@@ -81,7 +81,7 @@ function join(...parts) {
  */
 export function resolveAsset(path) {
   if (!path || !root || !root.covers) return null;
-  const rel = String(path).replace(/^[\/]+/, '').replace(/^data[\/]/, '');
+  const rel = String(path).replace(/^[\\/]+/, '').replace(/^data[\\/]/, '');
   return fileSrc(join(root.path, rel));
 }
 
