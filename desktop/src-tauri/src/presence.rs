@@ -65,7 +65,15 @@ pub struct Presence {
     failed_at: Mutex<Option<Instant>>,
 }
 
-/// The client id: the environment first, then config.toml.
+/// The application id the binary is built with. Not a secret: it is
+/// what Discord's client reads off the pipe, and it names the activity
+/// "999 Vault". Here so an install on a machine that has never seen a
+/// config file gets the presence without being told about it. The
+/// environment and the config file still override it.
+const DEFAULT_ID: &str = "1548116060031680664";
+
+/// The client id: the environment first, then config.toml, then the
+/// one built in.
 fn client_id(app: &AppHandle) -> Option<String> {
     if let Some(value) = std::env::var_os(ENV_ID) {
         let value = value.to_string_lossy().trim().to_string();
@@ -73,7 +81,7 @@ fn client_id(app: &AppHandle) -> Option<String> {
             return Some(value);
         }
     }
-    data::config_str(app, CONFIG_KEY)
+    data::config_str(app, CONFIG_KEY).or_else(|| Some(DEFAULT_ID.to_string()))
 }
 
 /// Make sure there is a live client, or say why not.

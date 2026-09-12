@@ -30,7 +30,8 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "../src": "pages"
+      "../src": "pages",
+      "../../web/data/catalogue.json": "seed/catalogue.json"
     }
   }
 }

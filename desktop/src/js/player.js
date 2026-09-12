@@ -138,11 +138,13 @@ function loadIndex() {
   return indexPromise;
 }
 
-/** The record id for a track, falling back to its title for playlist
-    items saved before `rid` existed. */
+/** The record id for a track, falling back to its title only for
+    playlist items saved before `rid` existed. A track that has a rid
+    and is not in the index is not on disk, full stop: matching it by
+    title would hand an instrumental the main track's file. */
 function ridFor(track) {
   if (!track) return null;
-  if (track.rid && byId.has(track.rid)) return track.rid;
+  if (track.rid) return byId.has(track.rid) ? track.rid : null;
   return byTitle.get(normalise(track.t)) || null;
 }
 
@@ -827,8 +829,16 @@ function randomTrack() {
   // Under the shell the pool can belong to a Vault page that has since
   // navigated away. Its function still runs, over the list it had, so
   // Next carries on from that filter; if it cannot, the pool is empty.
+  // Files on disk first. Only when the filtered set has none of those
+  // (a fresh install with nothing pulled, or a filter on a category
+  // that was never pulled) does the pick reach for tracks that can
+  // stream, which load() does on its own when srcFor() finds nothing.
   let pool;
-  try { pool = vaultPool().filter(hasAudio); } catch { pool = []; }
+  try {
+    const all = vaultPool();
+    pool = all.filter(hasAudio);
+    if (!pool.length) pool = all.filter((t) => t && t.rid);
+  } catch { pool = []; }
   if (!pool.length) return null;
 
   const fresh = pool.filter((t) => !recent.has(ridFor(t)));

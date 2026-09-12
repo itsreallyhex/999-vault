@@ -33,10 +33,15 @@ Only changes under `src-tauri/` need a rebuild.
 
 ## Point it at the archive
 
-The app carries no data. It reads the same `web/data` folder the site does.
+**With nothing on the machine, it works anyway.** The installer carries the
+catalogue (the whole app is under 3 MB), so on first run the app writes it
+to its own data folder and opens with all 3,879 records. Covers come from
+the archive's CDN and songs stream from it. Install, open, listen.
 
-A dev build inside the checkout finds it on its own. Anything else is told
-where to look, first hit winning:
+With the archive on disk it reads that instead: the same `web/data` folder
+the site uses, covers and audio included. A dev build inside the checkout
+finds it on its own. Anything else is told where to look, first hit
+winning:
 
 1. `NINE_DATA_ROOT` in the environment.
 2. `data_root` in the config file.
@@ -66,7 +71,9 @@ writes as you go. It starts empty.
 **The Vault and the playlists** are the site's, with two additions. The
 playing track is marked on its row and card, and a track you never pulled to
 disk streams from the archive instead of refusing; the bar says `via API`
-while it does. One click on a Vault card opens the detail panel, two play it.
+while it does. Next prefers files on disk and streams only when the current
+filter has none. One click on a Vault card opens the detail panel, two play
+it.
 
 **The player** lives outside the pages, so switching tabs does not stop the
 music.
@@ -115,7 +122,8 @@ diverged.
 
 - The Vault, the now-playing mark and the double click are proved in jsdom
   only; not yet seen in the window.
-- Next in the Vault picks from disk only. It never streams.
+- The catalogue a fresh install starts from is the one the installer was
+  built with. Refreshing it still needs `sync.py`, which needs Python.
 - The audio index loads once per launch. Run `save-audio.py` with the app
   closed, or restart it.
 - `run_tool` can run the Python scripts but nothing in the interface calls

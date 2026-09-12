@@ -1,10 +1,8 @@
 //! Where the archive lives, and reading the two JSON indexes out of it.
 //!
-//! The app does not carry its own copy. The catalogue is 1.67 MB, the
-//! covers are 102 MB and the audio is nearly 26 GB, so it reads the same
-//! folder the site does rather than duplicating any of it, and it
-//! certainly does not copy it into the app data directory on first run.
-//! It points; it never copies.
+//! The app does not carry the archive. The covers are 102 MB and the
+//! audio is nearly 26 GB, so it reads the same folder the site does
+//! rather than duplicating any of it. It points; it never copies.
 //!
 //! Resolution order, first one that exists wins:
 //!
@@ -13,6 +11,16 @@
 //!   3. A data folder beside the executable.
 //!   4. A data folder in the OS app data directory.
 //!   5. web/data in a checkout above the executable.
+//!
+//! The one exception to "never copies" is the catalogue, which is
+//! 1.67 MB and the difference between an app that opens and one that
+//! asks the live archive on every launch. The installer carries a copy
+//! (bundle.resources, under seed/), and when none of the five rules
+//! finds anything the app writes it into rule 4's folder once, with
+//! every cover pointed back at the archive's CDN because a fresh
+//! machine has no covers on disk. From then on rule 4 answers. A
+//! machine that has an archive never sees this: the seed is only read
+//! when nothing else exists.
 //!
 //! None of that is known at compile time, which is the point: the same
 //! binary works from the build directory, from a folder it was copied
@@ -37,7 +45,10 @@ const TEMPLATE: &str = r#"# 999 desktop configuration.
 # data_root is the folder holding catalogue.json, covers/, audio/ and
 # audio-index.json. Leave it empty and the app looks, in order, for a
 # data folder beside the executable, then one in this folder, then a
-# web/data in a checkout above the executable.
+# web/data in a checkout above the executable. If none of those exists
+# it writes the catalogue the installer came with into a data folder
+# here, so the app works with nothing else on the machine: covers come
+# from the archive and songs stream from it.
 #
 # tools_dir is the folder holding save-catalogue.py, sync.py and
 # save-audio.py. Same idea, looking for tools and then web/tools.
@@ -49,7 +60,8 @@ const TEMPLATE: &str = r#"# 999 desktop configuration.
 # page is a reload in the window (Ctrl+R), with no rebuild.
 #
 # discord_client_id is the application id from discord.com/developers,
-# for the "Listening to" status. Leave it empty and nothing is shown.
+# for the "Listening to" status. Leave it empty and the app uses the
+# id it was built with, which shows as "999 Vault".
 #
 # All four are overridden by the environment: NINE_DATA_ROOT,
 # NINE_TOOLS_DIR, NINE_PAGES_DIR, NINE_DISCORD_ID.
@@ -115,7 +127,58 @@ pub fn resolve(app: &AppHandle) -> (PathBuf, String) {
         (paths::data_dir(app).map(|dir| dir.join("data")), "the app data folder"),
         (paths::walk_up_for("web/data"), "web/data above the executable"),
     ])
+    .or_else(|| seed(app).map(|dir| (dir, "seeded from the installer".to_string())))
     .unwrap_or_else(|| (PathBuf::new(), "not found".to_string()))
+}
+
+/// Where the bundled catalogue lands: `seed/catalogue.json` under the
+/// resource directory, per bundle.resources in tauri.conf.json.
+const SEED_NAME: &str = "seed/catalogue.json";
+
+/// The archive's cover endpoint. The cover id is the record id on
+/// every record (measured: 3,879 of 3,879), and the URL answers with no
+/// `?v=`, so a cover can be pointed at the CDN knowing only the record.
+const COVER_CDN: &str = "/cdn/music/covers/";
+
+/// Make a data folder out of the catalogue the installer carries.
+///
+/// Only reached when nothing else was found. Writes `catalogue.json`
+/// into the app data folder with each `cover` repointed from the
+/// checkout's `data/covers/<sha1>.webp` to the CDN, since the covers
+/// themselves are not shipped, and `covers` set to "cdn" so the file
+/// says what it is. Returns the folder, which rule 4 finds from then
+/// on. Any failure returns None and the app falls through to the live
+/// archive as before; nothing here is fatal.
+fn seed(app: &AppHandle) -> Option<PathBuf> {
+    let source = paths::resource_dir(app)?.join(SEED_NAME);
+    let text = std::fs::read_to_string(&source).ok()?;
+    let mut snapshot: serde_json::Value = serde_json::from_str(&text).ok()?;
+
+    if let Some(songs) = snapshot.get_mut("songs").and_then(|v| v.as_array_mut()) {
+        for song in songs.iter_mut() {
+            let id = match song.get("id").and_then(|v| v.as_str()) {
+                Some(id) => id.to_string(),
+                None => continue,
+            };
+            let local = song
+                .get("cover")
+                .and_then(|v| v.as_str())
+                .map(|c| c.starts_with("data/covers/"))
+                .unwrap_or(false);
+            if local {
+                song["cover"] = serde_json::Value::String(format!("{}{}", COVER_CDN, id));
+            }
+        }
+    }
+    snapshot["covers"] = serde_json::Value::String("cdn".to_string());
+
+    let dir = paths::data_dir(app)?.join("data");
+    std::fs::create_dir_all(&dir).ok()?;
+    let out = serde_json::to_string(&snapshot).ok()?;
+    std::fs::write(dir.join("catalogue.json"), out).ok()?;
+
+    println!("999: seeded    {} from the installer's catalogue", dir.to_string_lossy());
+    Some(paths::tidy(dir.canonicalize().unwrap_or(dir)))
 }
 
 /// Describe the archive folder, including what is actually in it.
