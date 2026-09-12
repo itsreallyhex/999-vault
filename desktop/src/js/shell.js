@@ -34,10 +34,23 @@ frame.title = '999';
 frame.src = 'index.html';
 
 // The window title follows the page in the frame, as it would have
-// with no shell in the way
+// with no shell in the way. And the pages come off disk, so a reload is
+// how an edit arrives: Ctrl+R or F5 inside the frame reloads the page
+// in it, leaving the player alone; Ctrl+Shift+R reloads the shell too.
+function reloadKeys(event) {
+  const r = event.key === 'r' || event.key === 'R';
+  if (event.key === 'F5' || (r && (event.ctrlKey || event.metaKey))) {
+    event.preventDefault();
+    if (event.shiftKey) window.location.reload();
+    else frame.contentWindow.location.reload();
+  }
+}
+document.addEventListener('keydown', reloadKeys);
+
 frame.addEventListener('load', () => {
   try {
     document.title = frame.contentDocument.title || '999';
+    frame.contentWindow.addEventListener('keydown', reloadKeys);
   } catch {
     // A page that will not say: keep the mark
   }

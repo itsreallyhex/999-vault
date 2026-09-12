@@ -42,10 +42,22 @@ const TEMPLATE: &str = r#"# 999 desktop configuration.
 # tools_dir is the folder holding save-catalogue.py, sync.py and
 # save-audio.py. Same idea, looking for tools and then web/tools.
 #
-# Both are overridden by the environment: NINE_DATA_ROOT, NINE_TOOLS_DIR.
+# pages_dir is the folder holding the app's own pages: shell.html, js/
+# and css/. Leave it empty and the app looks for a pages folder beside
+# the executable, then desktop/src in a checkout above it, then the
+# copy the installer bundled. Point it at a checkout and an edit to a
+# page is a reload in the window (Ctrl+R), with no rebuild.
+#
+# discord_client_id is the application id from discord.com/developers,
+# for the "Listening to" status. Leave it empty and nothing is shown.
+#
+# All four are overridden by the environment: NINE_DATA_ROOT,
+# NINE_TOOLS_DIR, NINE_PAGES_DIR, NINE_DISCORD_ID.
 
 data_root = ""
 tools_dir = ""
+pages_dir = ""
+discord_client_id = ""
 "#;
 
 /// What the frontend is told about the archive.
@@ -77,8 +89,8 @@ pub fn config_file(app: &AppHandle) -> Option<PathBuf> {
     Some(file)
 }
 
-/// One key out of the config file, ignoring a key that is set to nothing.
-pub fn from_config(app: &AppHandle, key: &str) -> Option<PathBuf> {
+/// One string out of the config file, ignoring a key set to nothing.
+pub fn config_str(app: &AppHandle, key: &str) -> Option<String> {
     let text = std::fs::read_to_string(config_file(app)?).ok()?;
     let parsed: toml::Value = text.parse().ok()?;
     let value = parsed.get(key)?.as_str()?.trim().to_string();
@@ -86,7 +98,12 @@ pub fn from_config(app: &AppHandle, key: &str) -> Option<PathBuf> {
     if value.is_empty() {
         return None;
     }
-    Some(PathBuf::from(value))
+    Some(value)
+}
+
+/// One path out of the config file, ignoring a key set to nothing.
+pub fn from_config(app: &AppHandle, key: &str) -> Option<PathBuf> {
+    config_str(app, key).map(PathBuf::from)
 }
 
 /// The archive folder, and the name of the rule that found it.

@@ -31,7 +31,7 @@
    ============================================================ */
 
 import { API_BASE } from './config.js';
-import { invoke, loadArchive, resolveAudio } from './tauri.js';
+import { invoke, loadArchive, resolveAudio, inTauri } from './tauri.js';
 import { make, clock } from './utils.js';
 import { buildCover, coverSpec } from './covers.js';
 import { swatchFor } from './ui.js';
@@ -371,6 +371,80 @@ export function sameTrack(a, b) {
   return normalise(a.t) === normalise(b.t);
 }
 
+/* ---------- Discord presence ----------
+   What the bar shows, on the owner's Discord profile too. Rust carries
+   it down the local pipe (presence.rs); this decides what goes.
+
+   Playing: the title, "Juice WRLD · category [· n of m]", the cover,
+   and start plus end timestamps so Discord draws its bar with elapsed
+   and total. Paused: no end, the start set to the moment of the pause,
+   and the second line "Paused", so Discord shows a timer counting up
+   from when it stopped. Nothing loaded, or the track ended: cleared.
+
+   The cover is the one thing that cannot come from disk. Discord's own
+   servers fetch the image, so it has to be a URL, and the archive's CDN
+   keys covers by record id, which every track here carries. A row
+   saved before `rid` existed has no URL and shows the app's icon.
+
+   Updates are coalesced: Discord rate-limits activity changes, and a
+   drag on the seek bar fires seeked many times a second. */
+
+const COVER_CDN = `${API_BASE}/cdn/music/covers/`;
+const PRESENCE_WAIT = 400;
+let presenceTimer = null;
+/** When the current pause began, for the count-up. */
+let pausedAt = 0;
+
+function presenceShown() {
+  const track = state.track;
+  if (!track || !audio.getAttribute('src') || audio.ended) return null;
+
+  const now = Math.floor(Date.now() / 1000);
+  const shown = {
+    title: track.t,
+    line: '',
+    image: track.rid ? COVER_CDN + encodeURIComponent(track.rid) : null,
+    start: null,
+    end: null
+  };
+
+  if (audio.paused) {
+    shown.line = 'Paused';
+    shown.start = Math.floor((pausedAt || Date.now()) / 1000);
+    return shown;
+  }
+
+  const bits = ['Juice WRLD', track.c];
+  if (state.context === 'playlist' && state.list.length) {
+    bits.push(`${state.cursor + 1} of ${state.list.length}`);
+  }
+  shown.line = bits.join(' · ');
+
+  const pos = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+  shown.start = now - Math.floor(pos);
+  if (Number.isFinite(audio.duration) && audio.duration > 0) {
+    shown.end = shown.start + Math.round(audio.duration);
+  }
+  return shown;
+}
+
+function presencePush() {
+  presenceTimer = null;
+  if (!inTauri) return;
+  const shown = presenceShown();
+  const call = shown ? invoke('presence_set', { shown }) : invoke('presence_clear');
+  call.catch(() => {
+    // Discord is not there, or the pipe closed. Nothing else cares.
+  });
+}
+
+/** Ask for an update soon. Repeated asks collapse into one. */
+function presenceSync() {
+  if (!inTauri || HOST) return;
+  clearTimeout(presenceTimer);
+  presenceTimer = setTimeout(presencePush, PRESENCE_WAIT);
+}
+
 /* ---------- Elements ---------- */
 
 const ui = {};
@@ -585,6 +659,7 @@ function paintPlaying(playing) {
   ui.play.setAttribute('aria-label', playing ? 'Pause' : 'Play');
   ui.bar.classList.toggle('is-playing', playing);
   notify();
+  presenceSync();
 }
 
 /** mm:ss, or a dash while the duration is still unknown. */
@@ -1048,6 +1123,7 @@ export function stop() {
   }
   document.body.classList.remove('has-player');
   clearResume();
+  presenceSync();
 }
 
 /** Whether the bar currently owns the keyboard, so a page's global
@@ -1219,6 +1295,7 @@ function wire() {
   });
 
   audio.addEventListener('pause', () => {
+    pausedAt = Date.now();
     tick();
     flushListened();
     paintPlaying(false);
@@ -1229,7 +1306,12 @@ function wire() {
     clearApiTimer();
     paintTimes();
     ui.range.disabled = !(Number.isFinite(audio.duration) && audio.duration > 0);
+    // The duration has arrived: the bar on Discord can have an end now
+    presenceSync();
   });
+
+  // A seek moves the elapsed time Discord is counting from
+  audio.addEventListener('seeked', presenceSync);
 
   audio.addEventListener('timeupdate', () => {
     if (!seeking && Number.isFinite(audio.duration) && audio.duration > 0) {
@@ -1267,6 +1349,8 @@ function wire() {
       paintPlaying(false);
       ui.range.value = '0';
       fill(ui.range);
+      // Ended is not paused: nothing to count up from, so it comes down
+      presenceSync();
       return;
     }
 
