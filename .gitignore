@@ -31,3 +31,11 @@
 
 __pycache__/
 *.pyc
+
+# The desktop app's build output and dependencies. target/ alone runs to
+# several GB of compiled crates, node_modules holds the Tauri CLI, and
+# gen/ is schema output the build writes for itself. All three are
+# rebuilt by `npm install` and `cargo build`.
+/desktop/node_modules/
+/desktop/src-tauri/target/
+/desktop/src-tauri/gen/

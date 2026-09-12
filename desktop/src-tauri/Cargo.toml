@@ -1,0 +1,23 @@
+[package]
+name = "vault999"
+version = "0.1.0"
+description = "999, as a desktop app. Vault and playlists only."
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+# The desktop binary is a thin wrapper around this, which is also what a
+# mobile target would call. Keeping run() in the library rather than in
+# main.rs is the shape Tauri expects.
+name = "vault999_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"

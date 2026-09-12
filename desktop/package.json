@@ -1,0 +1,14 @@
+{
+  "name": "999-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "999, as a desktop app. Vault and playlists only.",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}
