@@ -4,13 +4,15 @@ Two projects live in this repo now, and they do not share code.
 
 ```text
 web/        The site. Four pages, a local Python server, and the scripts
-            that save the catalogue, the covers and the audio. This is
-            the finished, working project.
-desktop/    A desktop app, not started yet. An empty skeleton.
+            that save the catalogue, the covers and the audio.
+desktop/    A Tauri app over the same archive: a listening overview, the
+            Vault, the playlists, a player that survives a tab switch,
+            and Discord Rich Presence. Builds, installs and runs.
+Assets/     Screenshots for both readmes, plus the mark as an SVG.
 ```
 
-Each folder is self-contained. `web/` has its own readme covering how the
-site actually works, which is the one worth reading.
+Each folder is self-contained and has its own readme: `web/README.md` for
+how the site works, `desktop/README.md` for the app.
 
 ## Running the site
 
@@ -38,13 +40,20 @@ Everything they read and write stays under `web/data/`.
 
 ## The desktop app
 
-`desktop/` is an empty folder structure and nothing else. No Tauri project has
-been scaffolded and nothing has been installed. See `desktop/README.md` for
-what it is meant to become.
+```bash
+cd desktop
+npm install
+npx tauri build        # release exe and installers under src-tauri/target/
+```
 
-It is deliberately independent of `web/`. It will not import from `web/js`, and
-nothing copies files between the two at build time. Some duplication between
-them is expected and fine.
+It needs Rust and, on Windows, the MSVC build tools with a Windows SDK. See
+`desktop/README.md` for the toolchain, where it finds the archive, and what
+has and has not been seen running.
+
+It is deliberately independent of `web/`. It does not import from `web/js`,
+and nothing copies files between the two at build time. Where both needed the
+same module, both have their own copy. They do share the archive on disk,
+because 26 GB is not worth duplicating to make a point.
 
 ## Notes
 

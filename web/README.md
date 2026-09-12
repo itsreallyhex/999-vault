@@ -13,7 +13,7 @@ and I am the only person who uses it. No deployment, no domain, no accounts, no
 analytics. This readme is here so I remember how the thing works later, not to
 introduce it to anybody.
 
-![The home page](Assets/landingpage.png)
+![The home page](../Assets/landingpage.png)
 
 ## What is here
 
@@ -22,7 +22,7 @@ introduce it to anybody.
 The main page. It lists every entry the archive holds, 3,879 of them, and lets
 you dig through them.
 
-![The Vault](Assets/vaultview.png)
+![The Vault](../Assets/vaultview.png)
 
 What you can do with it:
 
@@ -93,7 +93,7 @@ A page about Jarad Higgins, 1998 to 2019. His five studio albums, a short
 timeline of what happened, what 999 meant to him, and where to get help if you
 need it.
 
-![The tribute page](Assets/tributeview.png)
+![The tribute page](../Assets/tributeview.png)
 
 ## Things worth knowing
 
