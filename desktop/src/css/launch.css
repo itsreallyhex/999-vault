@@ -1,0 +1,105 @@
+/* ============================================================
+   The start screen.
+
+   Not a port of the site's landing page. That page exists to explain
+   the project to somebody arriving at it; this one exists because an
+   app that opens straight into one of its two halves makes the other
+   half feel like a detour. So: the mark, one line, two doors.
+
+   Tokens, the reset and the mark itself come from app.css.
+   ============================================================ */
+
+.launch {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background:
+    radial-gradient(90rem 50rem at 50% -20%, rgba(139, 92, 246, 0.14), transparent 65%),
+    var(--bg);
+}
+
+.launch-in {
+  width: min(52rem, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.4rem;
+  text-align: center;
+}
+
+.launch-mark {
+  font-size: 4.6rem;
+  stroke: url(#mark-grad);
+}
+
+.launch-deck {
+  color: var(--dim);
+  font-size: var(--step-0);
+  margin: 0;
+}
+
+/* Two doors, side by side, collapsing to one column when the window is
+   dragged narrow. */
+.launch-picks {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 0.6rem;
+}
+
+@media (max-width: 640px) {
+  .launch-picks { grid-template-columns: 1fr; }
+}
+
+.pick {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 1.5rem 1.4rem 1.3rem;
+  text-align: left;
+  text-decoration: none;
+  color: inherit;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.pick:hover,
+.pick:focus-visible {
+  background: var(--bg-3);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.pick-name {
+  font-family: 'Righteous', sans-serif;
+  font-size: var(--step-1);
+}
+
+.pick-note {
+  color: var(--faint);
+  font-size: var(--step--1);
+  line-height: 1.6;
+}
+
+/* Held at a fixed height so the row does not jump when the counts
+   arrive a moment after the window paints. */
+.pick-figure {
+  margin-top: 0.35rem;
+  min-height: 1.2em;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: var(--step--1);
+  color: var(--accent-2);
+}
+
+.launch-status {
+  margin: 0.4rem 0 0;
+  color: var(--faint);
+  font-size: var(--step--1);
+  line-height: 1.6;
+}
+
+.launch-status[data-state="bad"] { color: var(--c-cut); }

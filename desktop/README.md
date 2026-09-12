@@ -1,23 +1,46 @@
 # 999, desktop
 
-Nothing has been built here yet. This folder is an empty skeleton so the shape
-of the thing is written down somewhere before any of it exists.
+A Tauri app. A trimmed down version of the site rather than a copy of it: a
+player, mainly.
 
 ```text
-src/          The frontend. Empty.
-src-tauri/    The Tauri side. Empty.
+src/          The frontend. Plain ES modules, no bundler.
+  index.html    The start screen.
+  vault.html    The archive index.
+  playlists.html
+  js/tauri.js   The only module that talks to Rust.
+src-tauri/    The Rust side.
+  src/data.rs   Finds the archive on disk, reads its two JSON indexes.
+  src/tools.rs  Runs the Python scripts.
 ```
 
-No Tauri project has been scaffolded, no dependencies have been installed, and
-there is no build. Creating the project is the first real step and it has not
-been taken.
+## Running it
 
-## What it is meant to be
+```bash
+cd desktop
+npm install
+npm run dev
+```
 
-A desktop app built with Tauri, and a trimmed down version of the site rather
-than a copy of it. A player, mainly.
+Needs Rust and, on Windows, the MSVC toolchain with a Windows SDK. Node is
+needed only for the Tauri CLI; nothing is bundled and the frontend ships as
+the files in `src/`.
 
-It carries two pages:
+## Where it reads the archive
+
+It does not carry its own copy. The catalogue is 1.67 MB, the covers are
+102 MB and the audio is nearly 26 GB, so it reads the same folder the site
+does. The path is resolved in this order:
+
+1. `NINE_DATA_ROOT` in the environment.
+2. `data_root` in `src-tauri/config.toml`.
+3. `../../web/data`, which is the default and almost certainly right.
+
+That is a data dependency, not a code one. Nothing here imports from `web/`.
+
+## What it carries
+
+Two pages:
 
 - **The Vault**, the archive index.
 - **Playlists**.
@@ -53,6 +76,10 @@ responds, and rewriting them would mean maintaining two implementations of the
 same fetching rules. The bearer token expiry, the `/stream` fallback for the
 three broken records and the cover deduplication all live in those files.
 
-This is a decision recorded early, not something to implement now. How the app
-locates a Python interpreter, and what it does when it cannot find one, are
-open questions.
+`tools.rs` wires this up: `run_tool` takes one of the three script names,
+refuses anything else, and hands back what the script printed. Nothing in the
+interface calls it yet, and a long run wants streaming output rather than one
+lump at the end, which is a later problem.
+
+How the app locates a Python interpreter, and what it does when it cannot find
+one, are still open. It calls `python` and expects it on PATH.

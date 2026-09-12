@@ -1,0 +1,433 @@
+/* ============================================================
+   The mini player.
+
+   Loaded after style.css by vault.html and playlists.html, and it
+   depends on that file's tokens: --bg, --line, --accent, --dur,
+   --ease and the per-category hues. It does not redefine any of them.
+
+   Kept out of style.css because the player is one component with a
+   lot of surface, and 50 KB of Vault styles is enough. The trade is
+   that the orphan-CSS check in CLAUDE.md has to read both files now,
+   or every class in here reads as missing.
+
+   Three things belong to other pages' markup and still live here,
+   because they exist only because the player does: .card-play on a
+   Vault card, .pl-play on a playlist row, and the .btn.is-on state
+   the playlists hero uses for its shuffle toggle.
+   ============================================================ */
+
+:root {
+  /* Above --z-modal (50): the bar is chrome, not content, and it
+     stays visible with the lightbox open so pressing Play in there
+     shows something happening. The picker is a real <dialog> in the
+     top layer, so it still covers this, which is correct. */
+  --z-player: 60;
+
+  /* Reserved at the bottom of the page so a fixed bar never sits on
+     top of the footer. Re-stated at each breakpoint where the bar
+     changes shape. */
+  --mini-h: 84px;
+}
+
+/* ============================================================
+   The bar
+   ============================================================ */
+
+.mini {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-player);
+  display: grid; align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: clamp(0.75rem, 2vw, 1.75rem);
+  padding: 0.7rem clamp(0.75rem, 2.5vw, 1.5rem);
+  min-height: var(--mini-h);
+
+  /* Not quite opaque, so the grid scrolling underneath stays legible
+     as motion rather than being walled off. */
+  background: rgba(12, 10, 18, 0.82);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -18px 40px rgba(0, 0, 0, 0.45);
+
+  /* Painted from the playing track's palette by player.js. These
+     defaults keep the bar neutral before the first track. */
+  --wash: var(--accent);
+  --wash-2: var(--accent-2);
+  --swatch: var(--accent);
+}
+
+/* A hairline of the category colour along the top edge. The one place
+   the bar says which kind of record is playing without words. */
+.mini::before {
+  content: ''; position: absolute; inset: 0 0 auto 0; height: 1px;
+  background: linear-gradient(90deg,
+    transparent, var(--swatch) 18%, var(--swatch) 82%, transparent);
+  opacity: 0.55; pointer-events: none;
+}
+
+/* The tint, as its own layer. The strength is this element's opacity
+   rather than a colour function, so an engine that does not know
+   color-mix still gets the same layout and a usable bar. */
+.mini-wash {
+  position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  opacity: 0.26;
+  background:
+    radial-gradient(70% 190% at 0% 100%, var(--wash) 0%, transparent 62%),
+    radial-gradient(50% 160% at 22% 0%, var(--wash-2) 0%, transparent 58%);
+  transition: opacity var(--dur) var(--ease);
+}
+.mini.is-playing .mini-wash { opacity: 0.36; }
+
+/* Everything else sits over the wash */
+.mini > *:not(.mini-wash) { position: relative; z-index: 1; }
+
+/* Rises into place the first time a track starts. An animation, not a
+   transition: the bar comes from display:none, and a transition out
+   of that never runs. */
+.mini:not([hidden]) { animation: mini-in 420ms var(--ease) both; }
+
+@keyframes mini-in {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* Keep the page clear of the bar */
+body.has-player { padding-bottom: calc(var(--mini-h) + 0.5rem); }
+
+/* ============================================================
+   Identity: artwork, title, category
+   ============================================================ */
+
+.mini-who {
+  display: flex; align-items: center; gap: 0.8rem; min-width: 0;
+}
+
+.mini-shot {
+  flex: none; width: 52px; height: 52px;
+  border-radius: 10px; overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+
+  /* The generated cover marks are sized in cqi, so a thumbnail with
+     no container of its own collapses them. The same reason .pl-shot
+     carries it on the playlists page. */
+  container-type: inline-size;
+  transition: box-shadow var(--dur) var(--ease);
+}
+.mini.is-playing .mini-shot {
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--swatch);
+}
+.mini-shot .cover { width: 100%; height: 100%; }
+
+.mini-text { display: flex; flex-direction: column; min-width: 0; gap: 0.15rem; }
+
+.mini-title {
+  font-weight: 600; font-size: var(--step-0); color: var(--text);
+  /* One line, clipped. Titles in this archive run long, and a
+     wrapping one would change the height of a fixed bar. */
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.mini-sub {
+  font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+  font-size: var(--step--2); letter-spacing: 0.06em;
+  color: var(--dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ---------- The three bars ----------
+   A state cue, not decoration: it is the one thing on the bar that
+   says "sound is coming out" without being read. */
+.mini-eq {
+  flex: none; display: none; align-items: flex-end; gap: 2px;
+  height: 15px; padding-left: 0.15rem;
+}
+.mini.is-playing .mini-eq { display: flex; }
+
+.mini-eq i {
+  display: block; width: 2.5px; height: 100%; border-radius: 2px;
+  background: var(--swatch); transform-origin: bottom;
+  animation: mini-eq 900ms var(--ease) infinite alternate;
+}
+.mini-eq i:nth-child(2) { animation-duration: 620ms; }
+.mini-eq i:nth-child(3) { animation-duration: 1120ms; }
+
+@keyframes mini-eq {
+  from { transform: scaleY(0.28); }
+  to   { transform: scaleY(1); }
+}
+
+/* ============================================================
+   Transport
+   ============================================================ */
+
+.mini-mid {
+  display: flex; flex-direction: column; align-items: center; gap: 0.3rem;
+  width: min(560px, 46vw);
+}
+
+.mini-row { display: flex; align-items: center; gap: 0.25rem; }
+
+.mini-btn {
+  display: grid; place-items: center; position: relative;
+  /* 44px, per the touch target rule, though the glyph is 18px */
+  min-width: 44px; min-height: 44px;
+  border: 0; border-radius: 50%; background: transparent;
+  color: var(--dim); cursor: pointer;
+  transition: color var(--dur) var(--ease), background-color var(--dur) var(--ease);
+}
+.mini-btn svg { width: 18px; height: 18px; }
+.mini-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.07); }
+
+.mini-play {
+  display: grid; place-items: center;
+  width: 52px; height: 52px; margin: 0 0.3rem;
+  border: 0; border-radius: 50%;
+  background: var(--text); color: #0B0910;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  /* Colour and shadow only. A scale on the primary control nudges the
+     row it sits in, which is the layout-shifting hover the guidelines
+     warn about. */
+  transition: background-color var(--dur) var(--ease),
+              box-shadow var(--dur) var(--ease);
+}
+.mini-play svg { width: 22px; height: 22px; }
+.mini-play:hover { background: #FFFFFF; box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55); }
+
+/* ---------- Shuffle and repeat ---------- */
+.mini-toggle.is-on { color: var(--accent-2); }
+
+/* A dot under an active toggle, so the state does not rest on colour
+   alone. */
+.mini-toggle.is-on::after {
+  content: ''; position: absolute; bottom: 6px; left: 50%;
+  width: 3px; height: 3px; margin-left: -1.5px;
+  border-radius: 50%; background: currentColor;
+}
+
+/* The "1" that tells repeat-one from repeat-all */
+.mini-badge {
+  position: absolute; top: 6px; right: 6px;
+  display: none; place-items: center;
+  min-width: 13px; height: 13px; padding: 0 2px;
+  border-radius: 7px; background: var(--accent-2); color: #14101F;
+  font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+  line-height: 1;
+}
+.mini-btn[data-mode="one"] .mini-badge { display: grid; }
+
+/* ============================================================
+   Seek and volume
+   ============================================================ */
+
+.mini-seek {
+  display: flex; align-items: center; gap: 0.6rem; width: 100%;
+}
+
+.mini-time {
+  flex: none; font-size: var(--step--2); color: var(--faint);
+  /* Fixed width, or the row twitches sideways every time the seconds
+     roll over from a 1 to a 0. */
+  min-width: 4.5ch; text-align: center;
+}
+
+/* ---------- The sliders ----------
+   One class for both, filled to --p, which player.js sets as a
+   percentage. Ranges need every vendor pseudo-element spelled out;
+   there is no shorthand that covers them. */
+.mini-range {
+  -webkit-appearance: none; appearance: none;
+  flex: 1 1 auto; min-width: 0; height: 18px;
+  background: transparent; cursor: pointer;
+  --p: 0%;
+}
+
+.mini-range::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent-2) var(--p),
+              rgba(255, 255, 255, 0.14) var(--p));
+}
+.mini-range::-moz-range-track {
+  height: 4px; border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent-2) var(--p),
+              rgba(255, 255, 255, 0.14) var(--p));
+}
+
+.mini-range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 11px; height: 11px; margin-top: -3.5px;
+  border: 0; border-radius: 50%; background: var(--text);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  transition: transform var(--dur) var(--ease);
+}
+.mini-range::-moz-range-thumb {
+  width: 11px; height: 11px;
+  border: 0; border-radius: 50%; background: var(--text);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  transition: transform var(--dur) var(--ease);
+}
+
+/* Grows under the pointer rather than appearing from nothing: a thumb
+   that is invisible until hover is a target nobody can aim at. */
+.mini-range:hover::-webkit-slider-thumb,
+.mini-range:focus-visible::-webkit-slider-thumb { transform: scale(1.45); }
+.mini-range:hover::-moz-range-thumb,
+.mini-range:focus-visible::-moz-range-thumb { transform: scale(1.45); }
+
+.mini-range:disabled { cursor: default; opacity: 0.45; }
+.mini-range:disabled::-webkit-slider-thumb { opacity: 0; }
+.mini-range:disabled::-moz-range-thumb { opacity: 0; }
+
+/* ---------- Volume ---------- */
+.mini-side {
+  display: flex; align-items: center; justify-content: flex-end; gap: 0.35rem;
+}
+
+.mini-volume { flex: 0 0 92px; width: 92px; }
+.mini.is-muted .mini-vol-btn { color: var(--c-cut); }
+
+.mini-close:hover { color: var(--c-cut); background: rgba(251, 113, 133, 0.12); }
+
+/* ---------- Nothing on disk ----------
+   The record is in the catalogue but the file was never pulled. The
+   bar stays up and says so rather than vanishing. */
+.mini.is-missing .mini-shot { filter: grayscale(1); opacity: 0.6; }
+.mini.is-missing .mini-sub { color: var(--c-cut); }
+.mini.is-missing .mini-play { background: var(--bg-3); color: var(--faint); }
+
+/* ============================================================
+   Focus
+   ============================================================ */
+
+.mini button:focus-visible,
+.mini input:focus-visible {
+  outline: 2px solid var(--accent-2); outline-offset: 2px; border-radius: 999px;
+}
+
+/* ============================================================
+   Play buttons on the other pages
+   ============================================================ */
+
+/* ---------- Vault card ----------
+   A sibling of the card, not a child: the card is itself a <button>.
+   .cell already carries position: relative for the add button. */
+.card-play {
+  position: absolute; z-index: 5;
+  /* Over the artwork, which is the square top half of the card, so
+     the centre of it sits above the centre of the cell. */
+  left: 50%; top: calc(50% - 1.4rem);
+  transform: translate(-50%, -50%) scale(0.86);
+  width: 46px; height: 46px; display: grid; place-items: center;
+  border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(8, 7, 12, 0.72); color: var(--text);
+  cursor: pointer; opacity: 0; pointer-events: none;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease),
+              background-color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.card-play svg { width: 18px; height: 18px; margin-left: 2px; }
+
+.cell:hover .card-play,
+.card-play:focus-visible {
+  opacity: 1; pointer-events: auto;
+  transform: translate(-50%, -50%) scale(1);
+}
+.card-play:hover {
+  background: var(--accent); border-color: var(--accent); color: #FFFFFF;
+}
+.card-play:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+
+/* Nothing to hover with on a touch screen, so it stays out */
+@media (hover: none) {
+  .card-play { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* ---------- Playlist row ----------
+   Safe to nest inside .pl-shot: a row is an <li> of spans, so this is
+   not a button inside a button. */
+.pl-shot { position: relative; }
+
+.pl-play {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  border: 0; border-radius: inherit; background: rgba(8, 7, 12, 0.62);
+  color: var(--text); cursor: pointer;
+  opacity: 0; transition: opacity var(--dur) var(--ease);
+}
+.pl-play svg { width: 16px; height: 16px; margin-left: 1px; }
+
+/* Invisible, but never out of the tab order: the same reasoning as
+   the row actions next to it. */
+.pl-row:hover .pl-play,
+.pl-play:focus-visible { opacity: 1; }
+.pl-play:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+
+@media (hover: none) { .pl-play { opacity: 1; } }
+
+/* ---------- The playlists hero shuffle ---------- */
+.btn.is-on {
+  border-color: var(--accent); color: var(--accent-2);
+  background: rgba(139, 92, 246, 0.12);
+}
+
+/* ============================================================
+   Narrower screens
+
+   The bar reflows rather than dropping controls, down to the point
+   where three columns will not fit. Below that the volume slider
+   goes: it is the one control the operating system also offers.
+   ============================================================ */
+
+@media (max-width: 1040px) {
+  .mini-volume { display: none; }
+  .mini-mid { width: min(520px, 52vw); }
+}
+
+@media (max-width: 780px) {
+  :root { --mini-h: 132px; }
+
+  /* Two rows: identity and volume across the top, the transport and
+     the seek bar underneath at full width, so the scrub target stays
+     big enough to hit with a thumb. */
+  .mini {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "who  side"
+      "mid  mid";
+    gap: 0.35rem 0.75rem;
+    padding: 0.6rem 0.85rem 0.75rem;
+  }
+  .mini-who { grid-area: who; }
+  .mini-side { grid-area: side; }
+  .mini-mid { grid-area: mid; width: 100%; gap: 0.1rem; }
+
+  .mini-shot { width: 44px; height: 44px; }
+}
+
+@media (max-width: 480px) {
+  :root { --mini-h: 128px; }
+
+  .mini { padding: 0.5rem 0.6rem 0.65rem; }
+  .mini-eq { display: none; }                /* no room beside the title */
+  .mini-btn { min-width: 40px; }             /* the 44px height stays */
+  .mini-play { width: 46px; height: 46px; margin: 0 0.15rem; }
+  .mini-time { min-width: 4ch; font-size: 0.62rem; }
+}
+
+/* ============================================================
+   Reduced motion
+
+   The bar still appears and still fills; it just stops moving on its
+   own. The equalizer is stilled rather than hidden: it carries state,
+   and hiding it would lose the information along with the animation.
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .mini:not([hidden]) { animation: none; }
+  .mini-eq i { animation: none; transform: scaleY(0.7); }
+  .mini-wash,
+  .mini-btn,
+  .mini-play,
+  .card-play,
+  .pl-play { transition-duration: 1ms; }
+}

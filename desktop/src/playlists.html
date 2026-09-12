@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Playlists: your own running order over the Juice WRLD archive, saved in this browser. Add from the Vault, reorder, export a backup.">
+  <meta name="theme-color" content="#08070C">
+  <title>999: Playlists</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/player.css">
+</head>
+<body>
+  <a class="skip-link" href="#board">Skip to the playlists</a>
+
+  <!-- The 999 mark, defined once and referenced by <use> wherever it is
+       needed. Parked off screen by .mark-defs rather than hidden: an SVG
+       that is not rendered stops resolving the gradient below. -->
+  <svg class="mark-defs" aria-hidden="true" focusable="false">
+    <linearGradient id="mark-grad" gradientUnits="userSpaceOnUse" x1="4" y1="10" x2="44" y2="38">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset=".55" stop-color="#C4B5FD"/>
+      <stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <symbol id="mark999" viewBox="0 10 48 28" fill="none" stroke-linecap="round">
+      <circle cx="9.5" cy="19" r="5.5"/>
+      <path d="M15 19 V28.5 Q15 34.5 9 34.5"/>
+      <circle cx="24" cy="19" r="5.5"/>
+      <path d="M29.5 19 V28.5 Q29.5 34.5 23.5 34.5"/>
+      <circle cx="38.5" cy="19" r="5.5"/>
+      <path d="M44 19 V28.5 Q44 34.5 38 34.5"/>
+    </symbol>
+  </svg>
+
+  <!-- ==================== NAV ==================== -->
+  <nav class="site-nav" aria-label="Primary">
+    <div class="site-nav-in">
+      <a class="brand" href="index.html" aria-label="999, home">
+        <span class="brand-mark" aria-hidden="true"><svg class="mark"><use href="#mark999"/></svg></span>
+        <span class="brand-text">A Juice WRLD fan project</span>
+      </a>
+
+      <ul class="site-nav-links">
+        <li><a href="vault.html">The Vault</a></li>
+        <li><a href="playlists.html" aria-current="page">Playlists</a></li>
+      </ul>
+
+      <a class="btn btn-ghost" href="vault.html">Open the Vault</a>
+    </div>
+  </nav>
+
+  <!-- ==================== HERO ====================
+       One hero, two states. data-mode="empty" is the library
+       landing; data-mode="list" is the selected playlist, washed
+       with the colour of its own first cover. -->
+  <header class="pl-hero" id="plHero" data-mode="empty">
+    <div class="pl-hero-wash" aria-hidden="true"></div>
+
+    <div class="pl-hero-in wrap">
+      <div class="pl-hero-art" id="plHeroArt" aria-hidden="true"></div>
+
+      <div class="pl-hero-body">
+        <p class="label pl-kind" id="plKind">Your library</p>
+        <h1 class="pl-title" id="plTitle">Playlists</h1>
+        <p class="pl-lede" id="plLede">
+          Your own running order over the archive. Add a track from any card in
+          the Vault, arrange it here, and it stays put between visits.
+        </p>
+
+        <p class="pl-stats mono" id="plStats" hidden></p>
+
+        <dl class="pl-figs" id="plFigs">
+          <div class="hero-fig">
+            <dt class="label">Playlists</dt>
+            <dd id="plFigLists">0</dd>
+          </div>
+          <div class="hero-fig">
+            <dt class="label">Tracks saved</dt>
+            <dd id="plFigTracks">0</dd>
+          </div>
+        </dl>
+
+        <div class="pl-hero-acts" id="plActs" hidden>
+          <button class="btn btn-primary" id="plPlay" type="button">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11.14-6.86a1 1 0 0 0 0-1.72L9.5 4.28A1 1 0 0 0 8 5.14z"/></svg>
+            Play
+          </button>
+          <button class="btn btn-ghost" id="plShuffle" type="button" aria-pressed="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3h5v5"/><path d="M21 3l-6.5 6.5"/><path d="M21 16v5h-5"/><path d="M14.5 14.5L21 21"/><path d="M3 3l6.5 6.5"/><path d="M3 21l7-7"/></svg>
+            Shuffle
+          </button>
+          <a class="btn btn-ghost" href="vault.html">
+            Add tracks
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+          <button class="btn btn-ghost" id="plEditBtn" type="button" aria-expanded="false" aria-controls="plForm">Edit details</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== BOARD ==================== -->
+  <main class="pl-board wrap" id="board">
+
+    <!-- ---------- Left: the library rail ---------- -->
+    <section class="pl-side" aria-label="Your playlists">
+      <div class="pl-side-head">
+        <p class="label">Library</p>
+        <p class="pl-side-n mono" id="plSideN"></p>
+      </div>
+
+      <ul class="pl-list" id="plLists" hidden></ul>
+
+      <p class="pl-side-empty" id="plListsEmpty" hidden>
+        No playlists yet. Name one below, or press the plus on any card in the
+        Vault and make one from there.
+      </p>
+
+      <form class="pl-new" id="plNewForm">
+        <label class="sr-only" for="plNewName">New playlist name</label>
+        <input class="pl-input" id="plNewName" type="text" maxlength="80"
+               autocomplete="off" placeholder="New playlist name">
+        <button class="btn btn-primary pl-new-go" type="submit">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          <span class="sr-only">Create playlist</span>
+        </button>
+      </form>
+
+      <div class="pl-backup">
+        <p class="label">Backup</p>
+        <p class="pl-backup-note">
+          Playlists live in this browser only. Clearing site data removes them,
+          so keep a copy if they matter.
+        </p>
+        <div class="pl-backup-row">
+          <button class="btn btn-ghost btn-sm" id="plExport" type="button">Export JSON</button>
+          <label class="btn btn-ghost btn-sm pl-file">
+            Import JSON
+            <input id="plImport" type="file" accept="application/json,.json">
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- Right: the selected list ---------- -->
+    <section class="pl-pane" id="plPane" aria-label="Playlist detail" hidden>
+
+      <!-- Collapsed until "Edit details": the showcase stays clean -->
+      <form class="pl-form" id="plForm" hidden>
+        <div class="pl-form-fields">
+          <label class="lbl" for="plName">Name</label>
+          <input class="pl-input" id="plName" type="text" maxlength="80" autocomplete="off">
+
+          <label class="lbl" for="plNoteField">Note</label>
+          <input class="pl-input" id="plNoteField" type="text" maxlength="240"
+                 autocomplete="off" placeholder="A note about this list (optional)">
+        </div>
+
+        <div class="pl-form-acts">
+          <button class="btn btn-primary btn-sm" type="submit">Save details</button>
+          <button class="btn btn-ghost btn-sm" id="plFormCancel" type="button">Cancel</button>
+          <button class="btn btn-ghost btn-sm pl-delete" id="plDelete" type="button">Delete playlist</button>
+        </div>
+      </form>
+
+      <div class="pl-rows-head" id="plRowsHead" hidden>
+        <span class="pl-h-pos mono">#</span>
+        <span class="pl-h-title">Title</span>
+        <span class="pl-h-cat">Category</span>
+        <span class="pl-h-len">Length</span>
+      </div>
+
+      <ol class="pl-rows" id="plRows" hidden></ol>
+
+      <p class="pl-rows-empty" id="plRowsEmpty" hidden>
+        Nothing in this playlist yet. Open the Vault and press the plus on a
+        card to put something here.
+      </p>
+    </section>
+
+    <section class="pl-blank" id="plBlank">
+      <div class="pl-blank-art" aria-hidden="true">
+        <span class="pl-blank-mark" aria-hidden="true"><svg class="mark"><use href="#mark999"/></svg></span>
+      </div>
+      <h2>Nothing selected</h2>
+      <p>
+        Pick a playlist on the left, or make one. Tracks are added from the
+        Vault, and each one keeps its own copy of the record, so a saved
+        playlist still reads correctly when the archive is unreachable.
+      </p>
+      <a class="btn btn-primary" href="vault.html">
+        Open the Vault
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+    </section>
+
+    <p class="pl-status" id="plStatus" role="status" aria-live="polite"></p>
+  </main>
+
+  <footer class="foot">
+    <div class="foot-in wrap">
+      <div class="foot-brand">
+        <span class="brand-mark" aria-hidden="true"><svg class="mark"><use href="#mark999"/></svg></span>
+        <p>
+          An unofficial fan project, not affiliated with the estate of Jarad
+          Higgins, Grade A Productions or Interscope Records. Playlists are
+          lists of records: the archive publishes catalogue data and cover
+          images, not audio, so nothing here plays.
+        </p>
+      </div>
+
+      <nav class="foot-nav" aria-label="Footer">
+        <div>
+          <p class="label">Pages</p>
+          <ul>
+            <li><a href="index.html">Start screen</a></li>
+            <li><a href="vault.html">The Vault</a></li>
+            <li><a href="playlists.html">Playlists</a></li>
+          </ul>
+        </div>
+      </nav>
+    </div>
+  </footer>
+
+  <script type="module" src="js/playlists.js"></script>
+</body>
+</html>
