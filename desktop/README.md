@@ -30,11 +30,27 @@ the files in `src/`.
 
 It does not carry its own copy. The catalogue is 1.67 MB, the covers are
 102 MB and the audio is nearly 26 GB, so it reads the same folder the site
-does. The path is resolved in this order:
+does. It points at that folder; it never copies it.
+
+Nothing is resolved at compile time. The path is worked out when the app
+starts, in this order, first one that exists winning:
 
 1. `NINE_DATA_ROOT` in the environment.
-2. `data_root` in `src-tauri/config.toml`.
-3. `../../web/data`, which is the default and almost certainly right.
+2. `data_root` in `config.toml`, in the OS config directory. On Windows that
+   is `%APPDATA%\xyz.juicevault.nine\config.toml`, and the app writes a commented
+   template there the first time it runs.
+3. A `data` folder beside the executable. This is the portable layout: copy
+   the exe and a data folder anywhere together and it works.
+4. A `data` folder in the OS app data directory.
+5. `web/data` in a checkout above the executable. This is what makes a dev
+   build work with no configuration at all, and it finds nothing on a
+   machine that has no checkout, which is the correct answer.
+
+The scripts in `tools/` are found the same way, with `NINE_TOOLS_DIR`,
+`tools_dir`, a `tools` folder beside the exe, Tauri's bundled resources, and
+then `web/tools`.
+
+The app prints both, and which rule found them, on startup.
 
 That is a data dependency, not a code one. Nothing here imports from `web/`.
 

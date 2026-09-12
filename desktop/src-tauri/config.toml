@@ -1,8 +1,0 @@
-# 999 desktop configuration.
-#
-# data_root is the folder holding catalogue.json, covers/, audio/ and
-# audio-index.json. Leave it empty to use ../../web/data, which is where
-# the site keeps them, and which is almost certainly what you want.
-#
-# The environment variable NINE_DATA_ROOT overrides this file.
-data_root = ""

@@ -36,11 +36,19 @@ function fileSrc(path) {
 /* ---------- The archive on disk ---------- */
 
 let root = null;
+let info = null;
 let pending = null;
 
-/** What Rust said about the archive folder, or null before it answered. */
+/** The archive folder, or null if there is not a usable one. */
 export function archive() {
   return root;
+}
+
+/** Everything Rust replied, whether it found an archive or not. Carries
+    the config file path, which is the useful thing to show when it did
+    not find one. */
+export function archiveInfo() {
+  return info;
 }
 
 /**
@@ -54,11 +62,13 @@ export function loadArchive() {
   if (pending) return pending;
 
   pending = invoke('data_root')
-    .then((info) => {
-      root = info && info.exists ? info : null;
+    .then((reply) => {
+      info = reply || null;
+      root = reply && reply.exists ? reply : null;
       return root;
     })
     .catch(() => {
+      info = null;
       root = null;
       return null;
     });

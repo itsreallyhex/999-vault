@@ -11,7 +11,7 @@
    across. Nothing here is ported from it.
    ============================================================ */
 
-import { invoke, loadArchive } from './tauri.js';
+import { invoke, loadArchive, archiveInfo } from './tauri.js';
 import { group } from './utils.js';
 
 const status = document.getElementById('status');
@@ -67,13 +67,15 @@ async function start() {
   const root = await loadArchive();
 
   if (!root) {
+    const where = archiveInfo()?.config_file;
     say('No archive folder found on this machine. The Vault will ask the '
-      + 'live archive instead. Point data_root at it in src-tauri/config.toml.', 'bad');
+      + 'live archive instead. Set data_root in '
+      + (where || 'the config file') + '.', 'bad');
   } else {
     const bits = [];
     if (!root.covers) bits.push('no covers saved');
     if (!root.audio) bits.push('no audio saved');
-    const where = `Archive: ${root.path}`;
+    const where = `Archive: ${root.path} (found by ${root.source})`;
     say(bits.length ? `${where} (${bits.join(', ')})` : where);
   }
 
