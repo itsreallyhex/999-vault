@@ -11,6 +11,7 @@
     "windows": [
       {
         "label": "main",
+        "url": "shell.html",
         "title": "999",
         "width": 1280,
         "height": 820,

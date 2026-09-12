@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#08070C">
+  <title>999</title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/player.css">
+  <link rel="stylesheet" href="css/shell.css">
+</head>
+<body class="shell">
+  <!-- The window opens here. This page owns the player bar and the
+       <audio> element and nothing else; the overview, the Vault and the
+       playlists are shown in the frame shell.js creates below, so a
+       navigation between them never touches the element and the sound
+       never stops. There is no markup for the frame or the bar: the
+       script makes both, in that order, so the page inside the frame
+       finds the player already there. -->
+  <script type="module" src="js/shell.js"></script>
+</body>
+</html>

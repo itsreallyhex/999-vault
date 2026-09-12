@@ -17,7 +17,16 @@
    which is how the rest of this project is built.
    ============================================================ */
 
-const TAURI = globalThis.__TAURI__ || null;
+/** Inside the shell's frame the bridge may only have been injected
+    into the top document. Same origin, so the parent's copy is usable
+    from here and calls through it are ordinary function calls. */
+const TAURI = globalThis.__TAURI__ || (() => {
+  try {
+    return window.parent !== window ? (window.parent.__TAURI__ || null) : null;
+  } catch {
+    return null;
+  }
+})();
 
 /** False in a plain browser, which is how the fallbacks below stay
     honest rather than throwing. */

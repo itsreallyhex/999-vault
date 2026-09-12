@@ -1,0 +1,24 @@
+/* ============================================================
+   The shell.
+
+   shell.html only. The frame fills the window and the player bar sits
+   under it. player.css already puts padding-bottom on body.has-player
+   to keep a fixed bar off the content, and the reset makes body
+   border-box, so the frame shrinks by exactly the bar's height when
+   the bar is up and takes the whole window when it is not. Nothing
+   here has to know how tall the bar is.
+   ============================================================ */
+
+html, body.shell { height: 100%; }
+
+body.shell {
+  margin: 0; overflow: hidden;
+  display: flex; flex-direction: column;
+  background: var(--bg);
+}
+
+.shell-frame {
+  flex: 1 1 auto; min-height: 0;
+  width: 100%; border: 0; display: block;
+  background: var(--bg);
+}
