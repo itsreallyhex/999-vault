@@ -1,120 +1,247 @@
 /* ============================================================
    Settings page. Layers on app.css for the tokens, the nav, .btn,
    .label and .mono; player.css for the bar. Everything here is
-   set- prefixed, plus the two controls (.seg, .switch) that no other
-   page has.
+   set- prefixed, plus the three controls no other page has: the
+   two-way choice (.seg), the switch (.switch) and the toast.
+
+   Motion, kept to what earns its place: the three groups rise in
+   once on load, the chosen card's tick scales in, the switch knob
+   slides, the toast slides up and away. Everything is transform or
+   opacity, 200 to 400 ms, ease-out, and all of it is off under
+   prefers-reduced-motion.
    ============================================================ */
 
-.set {
-  max-width: 880px;
-  margin-inline: auto;
-  padding-block: clamp(1.5rem, 1rem + 2vw, 3rem) 4rem;
+/* ---------- Hero band ---------- */
+.set-hero {
+  position: relative; overflow: hidden;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-2);
 }
-
-.set-head { margin-bottom: 2rem; }
+.set-hero-wash {
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(105% 130% at 14% 0%, var(--accent) 0%, transparent 58%),
+    linear-gradient(180deg, var(--bg-3) 0%, transparent 74%);
+  opacity: 0.16;
+}
+.set-hero-in {
+  position: relative;
+  max-width: 880px; margin-inline: auto;
+  padding-block: clamp(1.6rem, 1rem + 2.4vw, 3rem) clamp(1.4rem, 1rem + 2vw, 2.4rem);
+}
 .set-title {
   font-family: 'Righteous', 'Poppins', sans-serif;
-  font-size: clamp(1.8rem, 1.1rem + 3vw, 3rem);
+  font-size: clamp(2rem, 1.1rem + 3.6vw, 3.6rem);
   line-height: 1; letter-spacing: -0.02em;
   margin: 0.4rem 0 0;
   background: linear-gradient(135deg, #fff 0%, var(--accent-2) 60%, var(--accent) 100%);
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
-.set-lede { margin: 0.7rem 0 0; color: var(--dim); line-height: 1.6; max-width: 52ch; }
 
-/* ---------- Groups and rows ---------- */
+/* The settings read back as chips. Each chip is a live readout: the
+   script rewrites the text and flips data-state; the chip animates
+   the change with a short pulse of its border. */
+.set-summary { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0 0; }
+.set-chip {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  padding: 0.35rem 0.75rem; border-radius: 999px;
+  border: 1px solid var(--line-2); background: color-mix(in srgb, var(--bg) 60%, transparent);
+  font-family: 'JetBrains Mono', monospace; font-size: var(--step--2);
+  color: var(--dim); letter-spacing: 0.02em;
+  transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.set-chip::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--faint);
+  transition: background var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.set-chip[data-state="on"] { color: var(--text); border-color: color-mix(in srgb, var(--accent) 45%, var(--line-2)); }
+.set-chip[data-state="on"]::before { background: var(--accent-2); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
+.set-chip[data-state="bad"]::before { background: var(--c-cut); }
+.set-chip.is-changed { animation: chip-pulse 600ms var(--ease); }
+@keyframes chip-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+  100% { box-shadow: 0 0 0 10px transparent; }
+}
+
+/* ---------- Page column ---------- */
+.set {
+  max-width: 880px;
+  margin-inline: auto;
+  padding-block: 1.5rem 4rem;
+  display: grid; gap: 0.9rem;
+}
+
+/* ---------- Groups ---------- */
 .set-group {
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   background: var(--bg-2);
-  padding: 1.1rem 1.25rem 1.25rem;
-  margin-bottom: 1rem;
+  padding: 1.25rem 1.35rem 1.35rem;
+  /* Rise in once, staggered by --i set in the markup */
+  animation: rise 520ms var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+  transition: border-color var(--dur) var(--ease);
 }
-.set-group > .label { margin: 0 0 0.6rem; }
+.set-group:hover { border-color: var(--line-2); }
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.set-group-head { display: flex; gap: 0.95rem; align-items: flex-start; min-width: 0; }
+.set-icon {
+  flex: none; display: grid; place-items: center;
+  width: 40px; height: 40px; border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-3));
+  color: var(--accent-2);
+}
+.set-icon svg { width: 20px; height: 20px; }
+
+.set-name { margin: 0.35rem 0 0; font-size: var(--step-1); font-weight: 600; line-height: 1.25; }
+.set-desc { margin: 0.35rem 0 0; color: var(--dim); font-size: var(--step--1); line-height: 1.6; max-width: 50ch; }
 
 .set-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 1rem 2rem;
-  align-items: start;
-  padding-block: 0.9rem;
-  border-top: 1px solid var(--line);
+  align-items: center;
 }
-.set-row:first-of-type { border-top: 0; }
 
-.set-name { margin: 0; font-weight: 600; }
-.set-desc { margin: 0.3rem 0 0; color: var(--dim); font-size: var(--step--1); line-height: 1.6; max-width: 48ch; }
 .set-path {
-  margin: 0.6rem 0 0; font-size: var(--step--1); color: var(--text);
-  overflow-wrap: anywhere;
+  display: inline-block; margin: 0.75rem 0 0;
+  padding: 0.4rem 0.7rem; border-radius: 8px;
+  background: var(--bg); border: 1px solid var(--line);
+  font-size: var(--step--1); color: var(--text);
+  overflow-wrap: anywhere; max-width: 100%;
 }
-.set-found { margin: 0.25rem 0 0; color: var(--faint); font-size: var(--step--2); }
+.set-path[data-state="none"] { color: var(--dim); border-style: dashed; }
 
-.set-note { margin: 0.8rem 0 0; color: var(--faint); font-size: var(--step--2); line-height: 1.6; }
+/* What the folder holds: three pills, lit or dim */
+.set-held { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin: 0.6rem 0 0; }
+.held {
+  padding: 0.2rem 0.6rem; border-radius: 999px;
+  font-size: var(--step--2); letter-spacing: 0.02em;
+  color: var(--faint); border: 1px solid var(--line);
+  text-decoration: line-through; text-decoration-color: var(--line-2);
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.held[data-on="true"] {
+  color: var(--accent-2); border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  text-decoration: none;
+}
+.set-by { margin-left: 0.3rem; color: var(--faint); font-size: var(--step--2); }
+
+.set-note { margin: 0.9rem 0 0; color: var(--faint); font-size: var(--step--2); line-height: 1.6; }
 .set-note .mono { color: var(--dim); overflow-wrap: anywhere; }
+#restartNote { color: var(--accent-2); }
 
-.set-btns { display: flex; flex-direction: column; gap: 0.5rem; }
-
-.set-status { margin: 0.5rem 0 0; min-height: 1.4em; color: var(--faint); font-size: var(--step--2); }
-.set-status[data-state="bad"] { color: var(--c-cut); }
+.set-btns { display: flex; flex-direction: column; gap: 0.5rem; align-items: stretch; }
 
 /* ---------- The two-way choice ----------
-   Two stacked cards, the chosen one lit in the accent. The radio is
-   still a radio (keyboard, screen readers), just not drawn. */
-.seg { display: grid; gap: 0.5rem; min-width: min(360px, 100%); }
+   Two cards side by side. The radio stays a real radio for the
+   keyboard and screen readers; the card is what is drawn. Chosen:
+   accent border, a soft inner glow, and a tick that scales in. */
+.seg {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem;
+  margin-top: 1.1rem;
+}
 .seg-opt { position: relative; display: block; cursor: pointer; }
-.seg-opt input {
-  position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer;
-}
+.seg-opt input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
 .seg-body {
-  display: block;
-  padding: 0.7rem 0.9rem 0.75rem 2.3rem;
-  border: 1px solid var(--line-2);
-  border-radius: var(--r);
+  position: relative; display: grid; grid-template-columns: auto 1fr auto; gap: 0.8rem;
+  align-items: start;
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--line-2); border-radius: var(--r);
   background: var(--bg-3);
-  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease),
+              box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease);
 }
-.seg-body::before {
-  content: '';
-  position: absolute; left: 0.9rem; top: 0.95rem;
-  width: 14px; height: 14px; border-radius: 50%;
-  border: 2px solid var(--faint);
-  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+.seg-ico {
+  display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px;
+  background: var(--bg-2); color: var(--dim);
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
+.seg-ico svg { width: 18px; height: 18px; }
+.seg-text { min-width: 0; }
 .seg-name { display: block; font-weight: 600; font-size: var(--step-0); }
-.seg-note { display: block; margin-top: 0.15rem; color: var(--dim); font-size: var(--step--2); line-height: 1.5; }
-.seg-opt:hover .seg-body { border-color: var(--accent-2); }
+.seg-note { display: block; margin-top: 0.2rem; color: var(--dim); font-size: var(--step--2); line-height: 1.5; }
+.seg-tick {
+  display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--accent); color: #fff;
+  transform: scale(0.4); opacity: 0;
+  transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 160ms var(--ease);
+}
+.seg-tick svg { width: 13px; height: 13px; }
+
+.seg-opt:hover .seg-body { border-color: var(--accent-2); transform: translateY(-1px); }
 .seg-opt input:checked + .seg-body {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, var(--bg-3));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent),
+              0 10px 30px -18px var(--accent);
 }
-.seg-opt input:checked + .seg-body::before {
-  border-color: var(--accent);
-  box-shadow: inset 0 0 0 3px var(--bg-3), inset 0 0 0 8px var(--accent);
-}
-.seg-opt input:focus-visible + .seg-body { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+.seg-opt input:checked + .seg-body .seg-ico { color: var(--accent-2); background: color-mix(in srgb, var(--accent) 18%, var(--bg-2)); }
+.seg-opt input:checked + .seg-body .seg-tick { transform: scale(1); opacity: 1; }
+.seg-opt input:focus-visible + .seg-body { outline: 2px solid var(--accent-2); outline-offset: 3px; }
 
 /* ---------- The switch ---------- */
-.switch { display: inline-flex; align-items: center; gap: 0.7rem; cursor: pointer; user-select: none; }
+.switch { display: inline-flex; align-items: center; gap: 0.75rem; cursor: pointer; user-select: none; }
 .switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .switch-track {
-  position: relative; width: 44px; height: 26px; border-radius: 13px;
+  position: relative; flex: none; width: 50px; height: 28px; border-radius: 14px;
   background: var(--line-2);
-  transition: background var(--dur) var(--ease);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+  transition: background 260ms var(--ease), box-shadow 260ms var(--ease);
 }
 .switch-knob {
   position: absolute; top: 3px; left: 3px;
-  width: 20px; height: 20px; border-radius: 50%;
+  width: 22px; height: 22px; border-radius: 50%;
   background: var(--text);
-  transition: transform var(--dur) var(--ease);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  transition: transform 260ms cubic-bezier(0.34, 1.3, 0.64, 1);
 }
-.switch input:checked + .switch-track { background: var(--accent); }
-.switch input:checked + .switch-track .switch-knob { transform: translateX(18px); }
-.switch input:focus-visible + .switch-track { outline: 2px solid var(--accent-2); outline-offset: 2px; }
-.switch-word { min-width: 2.2em; color: var(--dim); font-size: var(--step--1); }
+.switch input:checked + .switch-track {
+  background: linear-gradient(135deg, var(--accent) 0%, #7C3AED 100%);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.switch input:checked + .switch-track .switch-knob { transform: translateX(22px); }
+.switch:hover .switch-track { filter: brightness(1.12); }
+.switch input:focus-visible + .switch-track { outline: 2px solid var(--accent-2); outline-offset: 3px; }
+.switch-word {
+  min-width: 2.2em; font-weight: 600; font-size: var(--step--1); color: var(--dim);
+  transition: color var(--dur) var(--ease);
+}
+.switch input:checked ~ .switch-word { color: var(--text); }
+
+/* ---------- Toast ---------- */
+.set-toast {
+  position: fixed; left: 50%; bottom: calc(var(--mini-h, 0px) + 1.25rem);
+  transform: translate(-50%, 16px);
+  margin: 0; padding: 0.6rem 1rem; border-radius: 999px;
+  background: var(--bg-3); border: 1px solid var(--line-2);
+  color: var(--text); font-size: var(--step--1);
+  box-shadow: 0 12px 30px -12px rgba(0, 0, 0, 0.7);
+  opacity: 0; pointer-events: none;
+  transition: opacity 240ms var(--ease), transform 320ms var(--ease);
+  z-index: var(--z-player, 60);
+  max-width: min(92vw, 60ch); text-align: center;
+}
+.set-toast.is-shown { opacity: 1; transform: translate(-50%, 0); }
+.set-toast[data-state="bad"] { border-color: color-mix(in srgb, var(--c-cut) 60%, var(--line-2)); color: var(--c-cut); }
 
 /* ---------- Narrow ---------- */
-@media (max-width: 600px) {
+@media (max-width: 640px) {
   .set-row { grid-template-columns: 1fr; }
+  .seg { grid-template-columns: 1fr; }
   .set-btns { flex-direction: row; flex-wrap: wrap; }
+}
+
+/* ---------- Motion off ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .set-group { animation: none; }
+  .set-chip.is-changed { animation: none; }
+  .seg-body, .seg-tick, .switch-track, .switch-knob, .set-toast, .set-chip, .held { transition: none; }
+  .seg-opt:hover .seg-body { transform: none; }
 }

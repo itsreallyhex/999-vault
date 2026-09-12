@@ -26,6 +26,25 @@
       <circle cx="38.5" cy="19" r="5.5"/>
       <path d="M44 19 V28.5 Q44 34.5 38 34.5"/>
     </symbol>
+    <!-- Icons for this page, 24x24, stroked, pulled in by <use> -->
+    <symbol id="i-drive" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 14h18"/><circle cx="7.5" cy="17" r="0.8" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-cloud" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M7 18a4 4 0 0 1-.6-7.95A6 6 0 0 1 18 9a4.5 4.5 0 0 1-.5 9H7z"/>
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5 12.5l4.5 4.5L19 7.5"/>
+    </symbol>
+    <symbol id="i-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="9"/><path d="M10 8.5v7l5.5-3.5z" fill="currentColor" stroke="none"/>
+    </symbol>
+    <symbol id="i-signal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/><path d="M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4"/><path d="M5 19a10 10 0 0 1 0-14M19 5a10 10 0 0 1 0 14"/>
+    </symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h4l2 2.5h7A2.5 2.5 0 0 1 21 10v7.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/>
+    </symbol>
   </svg>
 
   <!-- ==================== NAV ==================== -->
@@ -46,75 +65,100 @@
     </div>
   </nav>
 
+  <!-- ==================== HERO ====================
+       The same band the other pages open with, washed in the accent.
+       The line under the title is the settings read back as a sentence,
+       so the page says what it will do before the controls are read. -->
+  <header class="set-hero">
+    <div class="set-hero-wash" aria-hidden="true"></div>
+    <div class="set-hero-in wrap">
+      <p class="label">Settings</p>
+      <h1 class="set-title">How it runs</h1>
+      <p class="set-summary" id="summary">
+        <span class="set-chip" data-k="source">Local first</span>
+        <span class="set-chip" data-k="discord">Discord on</span>
+        <span class="set-chip" data-k="root">Looking for the archive</span>
+      </p>
+    </div>
+  </header>
+
   <!-- ==================== SETTINGS ====================
        Every control writes straight to the config file through Rust
        and redraws from what came back, so what the page shows is what
-       the file says. Nothing here needs a save button. -->
+       the file says. Nothing here needs a save button. The defaults
+       are drawn first, so a backend that cannot answer still leaves a
+       page that reads correctly. -->
   <main class="set wrap" id="settings">
-    <header class="set-head">
-      <p class="label">Settings</p>
-      <h1 class="set-title">How it runs</h1>
-      <p class="set-lede">Changes are saved the moment you make them, to this machine only.</p>
-    </header>
 
-    <section class="set-group" aria-labelledby="hPlay">
-      <h2 class="label" id="hPlay">Playback</h2>
-
-      <div class="set-row">
-        <div class="set-text">
-          <p class="set-name">Where songs come from</p>
+    <section class="set-group" aria-labelledby="hPlay" style="--i: 0">
+      <div class="set-group-head">
+        <span class="set-icon" aria-hidden="true"><svg><use href="#i-play"/></svg></span>
+        <div>
+          <h2 class="set-name" id="hPlay">Where songs come from</h2>
           <p class="set-desc">Songs can play from files saved on this machine or stream from the archive. This decides which the app tries first.</p>
         </div>
-        <div class="set-ctl">
-          <div class="seg" role="radiogroup" aria-label="Where songs come from">
-            <label class="seg-opt">
-              <input type="radio" name="source" value="local">
-              <span class="seg-body">
-                <span class="seg-name">Local first</span>
-                <span class="seg-note">The file on this machine if there is one, the archive if not.</span>
-              </span>
-            </label>
-            <label class="seg-opt">
-              <input type="radio" name="source" value="stream">
-              <span class="seg-body">
-                <span class="seg-name">Stream first</span>
-                <span class="seg-note">The archive, and the file on this machine only if the archive fails.</span>
-              </span>
-            </label>
+      </div>
+
+      <div class="seg" role="radiogroup" aria-labelledby="hPlay">
+        <label class="seg-opt">
+          <input type="radio" name="source" value="local" checked>
+          <span class="seg-body">
+            <span class="seg-ico" aria-hidden="true"><svg><use href="#i-drive"/></svg></span>
+            <span class="seg-text">
+              <span class="seg-name">Local first</span>
+              <span class="seg-note">The file on this machine if there is one, the archive if not.</span>
+            </span>
+            <span class="seg-tick" aria-hidden="true"><svg><use href="#i-check"/></svg></span>
+          </span>
+        </label>
+        <label class="seg-opt">
+          <input type="radio" name="source" value="stream">
+          <span class="seg-body">
+            <span class="seg-ico" aria-hidden="true"><svg><use href="#i-cloud"/></svg></span>
+            <span class="seg-text">
+              <span class="seg-name">Stream first</span>
+              <span class="seg-note">The archive, and the file on this machine only if the archive fails.</span>
+            </span>
+            <span class="seg-tick" aria-hidden="true"><svg><use href="#i-check"/></svg></span>
+          </span>
+        </label>
+      </div>
+    </section>
+
+    <section class="set-group" aria-labelledby="hDiscord" style="--i: 1">
+      <div class="set-row">
+        <div class="set-group-head">
+          <span class="set-icon" aria-hidden="true"><svg><use href="#i-signal"/></svg></span>
+          <div>
+            <h2 class="set-name" id="hDiscord">Show what is playing on Discord</h2>
+            <p class="set-desc">"Listening to 999 Vault" on your profile, with the song and its cover, while Discord is open. Off keeps it to yourself.</p>
           </div>
         </div>
+        <label class="switch">
+          <input type="checkbox" id="discord" checked>
+          <span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span>
+          <span class="switch-word" id="discordWord" data-on="On" data-off="Off">On</span>
+        </label>
       </div>
     </section>
 
-    <section class="set-group" aria-labelledby="hDiscord">
-      <h2 class="label" id="hDiscord">Discord</h2>
-
+    <section class="set-group" aria-labelledby="hArchive" style="--i: 2">
       <div class="set-row">
-        <div class="set-text">
-          <p class="set-name">Show what is playing on Discord</p>
-          <p class="set-desc">"Listening to 999 Vault" on your profile, with the song and its cover, while Discord is open. Off keeps it to yourself.</p>
+        <div class="set-group-head">
+          <span class="set-icon" aria-hidden="true"><svg><use href="#i-folder"/></svg></span>
+          <div>
+            <h2 class="set-name" id="hArchive">Archive folder</h2>
+            <p class="set-desc">The folder holding the song list, and the covers and audio if they have been saved.</p>
+            <p class="set-path mono" id="rootPath">Looking for the archive</p>
+            <p class="set-held" id="rootFound">
+              <span class="held" data-k="catalogue">song list</span>
+              <span class="held" data-k="covers">covers</span>
+              <span class="held" data-k="audio">audio</span>
+              <span class="set-by" id="rootBy"></span>
+            </p>
+          </div>
         </div>
-        <div class="set-ctl">
-          <label class="switch">
-            <input type="checkbox" id="discord">
-            <span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span>
-            <span class="switch-word" id="discordWord">On</span>
-          </label>
-        </div>
-      </div>
-    </section>
-
-    <section class="set-group" aria-labelledby="hArchive">
-      <h2 class="label" id="hArchive">Archive</h2>
-
-      <div class="set-row">
-        <div class="set-text">
-          <p class="set-name">Archive folder</p>
-          <p class="set-desc" id="rootDesc">The folder holding the song list, and the covers and audio if they have been saved.</p>
-          <p class="set-path mono" id="rootPath"></p>
-          <p class="set-found" id="rootFound"></p>
-        </div>
-        <div class="set-ctl set-btns">
+        <div class="set-btns">
           <button class="btn btn-ghost" id="pickRoot" type="button">Choose folder</button>
           <button class="btn btn-ghost" id="clearRoot" type="button" hidden>Use default</button>
         </div>
@@ -123,9 +167,10 @@
       <p class="set-note" id="restartNote" hidden>The new folder is used the next time the app opens.</p>
       <p class="set-note">Config file: <span class="mono" id="cfgPath"></span></p>
     </section>
-
-    <p class="set-status" id="status" role="status" aria-live="polite"></p>
   </main>
+
+  <!-- The one-line confirmation, slid up from the bottom for a moment -->
+  <p class="set-toast" id="status" role="status" aria-live="polite"></p>
 
   <script type="module" src="js/settings.js"></script>
 </body>
