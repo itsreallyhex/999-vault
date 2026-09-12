@@ -10,6 +10,7 @@
 
 import { PALETTES, COMPOSITIONS } from './config.js';
 import { hash, make } from './utils.js';
+import { coverUrl } from './api.js';
 
 /** title -> { art, pal }. Rebuilt whenever the dataset changes. */
 let assignments = {};
@@ -113,12 +114,30 @@ export function applyCover(cover, track) {
  * generated one. If the image fails, it hides itself and the generated
  * cover underneath shows through.
  */
+/**
+ * The URL to actually load for a track's artwork, or null.
+ *
+ * `cov` is a path, not a URL: `data/covers/<sha1>.webp` from a saved
+ * snapshot, or `/cdn/...` from the live listing. Both are portable and
+ * both are what gets written into a playlist row. Turning one into
+ * something this window can load is a rendering concern and happens
+ * here, once, at the moment a cover is drawn.
+ *
+ * Null when the archive folder is not there, which leaves the generated
+ * cover underneath showing through: the same thing the site does when a
+ * cover fails to load.
+ */
+export function coverSrc(track) {
+  if (!track) return null;
+  return coverUrl(track.cov) || track.art || null;
+}
+
 export function buildCover(track, { tag = 'span', eager = false } = {}) {
   const cover = make(tag, 'cover');
   cover.appendChild(make('span', 'cover-mark'));
   applyCover(cover, track);
 
-  const src = track.cov || track.art;
+  const src = coverSrc(track);
   if (src) {
     const img = document.createElement('img');
     img.className = 'cover-img';

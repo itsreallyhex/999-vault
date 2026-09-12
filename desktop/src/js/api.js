@@ -25,6 +25,11 @@ export function coverUrl(path) {
   if (!path) return null;
   if (path.startsWith('/cdn/')) return API_BASE + path;
 
+  // A playlist row saved before covers were stored as paths carries a
+  // whole asset URL. Hand those back untouched so old rows keep their
+  // artwork instead of being mangled into a path that resolves nowhere.
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(path)) return path;
+
   // A saved catalogue points at `data/covers/<sha1>.webp`, which means
   // nothing to a webview with no server under it. Rust knows where that
   // folder is; resolveAsset turns it into a URL the window can load, and
@@ -57,7 +62,12 @@ export function toTrack(rec) {
     p: rec.play_count || 0,
     d: (rec.archive_added_at || '').slice(0, 10),
     se: Boolean(rec.is_session_edit),
-    cov: coverUrl(rec.cover)
+    // The path as the archive or the snapshot gave it, not a resolved
+    // URL. db.js stores this shape verbatim, and an asset URL baked in
+    // at add-time would point at wherever the archive happened to live
+    // that day. Resolution happens when a cover is drawn: coverSrc in
+    // covers.js.
+    cov: rec.cover || null
   };
 }
 

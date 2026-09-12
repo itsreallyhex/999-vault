@@ -7,7 +7,7 @@
 
 import { CATEGORIES } from './config.js';
 import { make, niceDate, group } from './utils.js';
-import { buildCover } from './covers.js';
+import { buildCover, coverSrc } from './covers.js';
 
 /**
  * Element references, bound once from the ids in vault.html.
@@ -141,7 +141,7 @@ async function swapTile() {
   try {
     // Load the artwork first. Building the tile before the image is ready
     // is what made the generated cover flash for a frame.
-    await preload(next.cov || next.art);
+    await preload(coverSrc(next));
 
     slotTracks[slot] = next;
 

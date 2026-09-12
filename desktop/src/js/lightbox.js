@@ -7,7 +7,7 @@
    ============================================================ */
 
 import { make, niceDate, group } from './utils.js';
-import { applyCover, markWhenReady } from './covers.js';
+import { applyCover, markWhenReady, coverSrc } from './covers.js';
 import { el, swatchFor } from './ui.js';
 
 /** The element that opened the panel, so focus can be handed back. */
@@ -42,7 +42,7 @@ export function openLightbox(track, source) {
 
   applyCover(el.lbCover, track);
 
-  const src = track.cov || track.art;
+  const src = coverSrc(track);
   if (src) {
     el.lbImg.referrerPolicy = 'no-referrer';
     el.lbImg.src = src;

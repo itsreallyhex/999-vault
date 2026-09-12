@@ -30,7 +30,7 @@
    the state is rebuilt on the other side instead.
    ============================================================ */
 
-import { invoke, resolveAudio } from './tauri.js';
+import { invoke, loadArchive, resolveAudio } from './tauri.js';
 import { make, clock } from './utils.js';
 import { buildCover, coverSpec } from './covers.js';
 import { swatchFor } from './ui.js';
@@ -88,8 +88,15 @@ function normalise(title) {
 function loadIndex() {
   if (indexPromise) return indexPromise;
 
-  indexPromise = invoke('read_audio_index')
-    .then((payload) => {
+  // loadArchive is in here rather than left to the entry point. The
+  // Vault gets it for free because api.js calls it while fetching the
+  // catalogue, but playlists.js never reads the archive at all, so on
+  // that page the root stayed null and resolveAudio returned null for
+  // every track: the bar said "Not saved to this machine" for files
+  // that were sitting right there. The module that needs the path is
+  // the one that should make sure it has it.
+  indexPromise = Promise.all([loadArchive(), invoke('read_audio_index')])
+    .then(([, payload]) => {
       const rows = payload && payload.by_id ? payload.by_id : {};
 
       Object.keys(rows).forEach((id) => {
