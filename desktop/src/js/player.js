@@ -35,12 +35,32 @@ import { invoke, loadArchive, resolveAudio } from './tauri.js';
 import { make, clock } from './utils.js';
 import { buildCover, coverSpec } from './covers.js';
 import { swatchFor } from './ui.js';
-import { pushRecent, recentIds, itemsIn } from './db.js';
+import { pushRecent, recentIds, itemsIn, logPlay, addListened } from './db.js';
 
 /* The audio index and the audio folder used to be URLs resolved against
    this module, which worked because a server was serving them. There is
    no server here: Rust reads the index and turns a saved filename into
    an asset URL. See tauri.js. */
+
+/* ---------- Framed by the shell ----------
+   shell.html holds the bar and the <audio> element and shows the three
+   pages in a same-origin frame, so a navigation inside the frame never
+   touches the element and the sound never stops. The shell puts its
+   own instance of this module on window.__nine_player; a page that
+   finds it there forwards every call to it and mounts nothing of its
+   own. Without a shell (a page opened bare, or the jsdom harness) HOST
+   is null and this module is the player, exactly as before. */
+
+const HOST = (() => {
+  try {
+    if (window.parent === window) return null;
+    const host = window.parent.__nine_player;
+    return host && typeof host.playTrack === 'function' ? host : null;
+  } catch {
+    // A cross-origin parent throws on access. Not ours, then.
+    return null;
+  }
+})();
 
 /** Volume is a per-viewer convenience, so localStorage is the right
     home for it. Nothing that must be reliable goes here. */
@@ -129,6 +149,7 @@ function ridFor(track) {
 /** Whether a track has a file on disk. Keeps the random pool to
     things that can actually play. */
 export function hasAudio(track) {
+  if (HOST) return HOST.hasAudio(track);
   return Boolean(ridFor(track));
 }
 
@@ -216,7 +237,61 @@ let recent = new Set();
 let vaultPool = () => [];
 
 export function setVaultPool(fn) {
+  if (HOST) { HOST.setVaultPool(fn); return; }
   if (typeof fn === 'function') vaultPool = fn;
+}
+
+/* ---------- Listening history ----------
+   One row in `plays` per track started, and the seconds actually
+   heard added to it as they pass. The overview on index.html is
+   drawn from nothing else. */
+
+/** The `plays` row for the loaded track, once logPlay has answered. */
+let playId = null;
+/** True from the first play of a loaded track until its row exists,
+    so a second play event cannot log the same start twice. */
+let logging = false;
+/** Where the element was at the last timeupdate, to turn a stream of
+    positions into seconds heard. */
+let lastPos = 0;
+/** Seconds heard that have not reached the database yet. */
+let unflushed = 0;
+
+/**
+ * Turn the element's position into seconds heard.
+ *
+ * Only a small forward step counts. A seek is a large one, a restart
+ * is a negative one, and neither is listening. So a drag on the seek
+ * bar moves the position without inventing time.
+ */
+function tick() {
+  const pos = audio.currentTime || 0;
+  const step = pos - lastPos;
+  if (step > 0 && step < 2) unflushed += step;
+  lastPos = pos;
+}
+
+/** Write the seconds heard so far. Called on a timer while playing
+    and at every boundary: pause, end, track change, navigation. */
+function flushListened() {
+  if (!playId || unflushed < 0.5) return;
+  const seconds = unflushed;
+  unflushed = 0;
+  addListened(playId, seconds).catch(() => {
+    // Storage refused. The seconds are gone; the play itself stands.
+  });
+}
+
+/** A track has started making sound for the first time since it was
+    loaded: give it a row. Seconds ticked while the row was in flight
+    wait in `unflushed` and land on the next flush. */
+function logStart() {
+  if (playId || logging || !state.track) return;
+  logging = true;
+  logPlay(state.track)
+    .then((id) => { playId = id; })
+    .catch(() => {})
+    .finally(() => { logging = false; });
 }
 
 /* ---------- Audio element ---------- */
@@ -266,6 +341,13 @@ function notify() {
  * the next event. Returns the unsubscribe.
  */
 export function onPlayback(fn) {
+  if (HOST) {
+    // The callback belongs to this page. Let go of it on the way out,
+    // so the shell is not left calling into a document that has gone.
+    const off = HOST.onPlayback(fn);
+    window.addEventListener('pagehide', off, { once: true });
+    return off;
+  }
   watchers.add(fn);
   fn(snapshot());
   return () => watchers.delete(fn);
@@ -668,7 +750,11 @@ function reorder() {
  * because a pick that cannot play is a dead button.
  */
 function randomTrack() {
-  const pool = vaultPool().filter(hasAudio);
+  // Under the shell the pool can belong to a Vault page that has since
+  // navigated away. Its function still runs, over the list it had, so
+  // Next carries on from that filter; if it cannot, the pool is empty.
+  let pool;
+  try { pool = vaultPool().filter(hasAudio); } catch { pool = []; }
   if (!pool.length) return null;
 
   const fresh = pool.filter((t) => !recent.has(ridFor(t)));
@@ -695,9 +781,19 @@ function randomTrack() {
  * Returns false when the track has no file: the bar says so and stays
  * on screen rather than throwing inside a click handler.
  */
-async function load(track, { autoplay = true, at = 0 } = {}) {
+async function load(track, { autoplay = true, at = 0, resumeId = null } = {}) {
   await loadIndex();
   clearApiTimer();
+
+  // Close the book on whatever was playing before the switch. A track
+  // resumed from the previous page keeps the row it already had, so a
+  // navigation mid-track is one play, not two.
+  tick();
+  flushListened();
+  playId = resumeId || null;
+  logging = false;
+  lastPos = at > 0 ? at : 0;
+  unflushed = 0;
 
   // The file on disk first, always. The archive's stream is only ever a
   // fallback for a track that was never pulled, and it must not be
@@ -776,6 +872,7 @@ async function load(track, { autoplay = true, at = 0 } = {}) {
  * left behind goes on it.
  */
 export function playTrack(track) {
+  if (HOST) return HOST.playTrack(track);
   if (state.track && state.context === 'vault' && state.track !== track) {
     state.history.push(state.track);
   }
@@ -794,6 +891,7 @@ export function playTrack(track) {
  * to go without reading the database again.
  */
 export function playFromPlaylist(playlistId, items, index) {
+  if (HOST) return HOST.playFromPlaylist(playlistId, items, index);
   state.context = 'playlist';
   state.playlistId = playlistId;
   state.list = items.slice();
@@ -818,6 +916,7 @@ export function playFromPlaylist(playlistId, items, index) {
 
 /** Play, or pause. */
 export function toggle() {
+  if (HOST) { HOST.toggle(); return; }
   if (!state.track) return;
   if (audio.paused) audio.play().catch(() => paintPlaying(false));
   else audio.pause();
@@ -831,6 +930,7 @@ export function toggle() {
  * playlist wraps or stops.
  */
 export function next({ auto = false } = {}) {
+  if (HOST) { HOST.next({ auto }); return; }
   if (state.context === 'playlist') {
     if (!state.list.length) return;
 
@@ -858,6 +958,7 @@ export function next({ auto = false } = {}) {
 
 /** Previous. The history stack in the Vault, one index back in a playlist. */
 export function previous() {
+  if (HOST) { HOST.previous(); return; }
   // The convention everywhere else: a few seconds in, Previous
   // restarts the track rather than leaving it.
   if (audio.currentTime > 3 && !audio.paused) {
@@ -889,6 +990,7 @@ export function previous() {
  * the control is not offered at all.
  */
 export function toggleShuffle() {
+  if (HOST) return HOST.toggleShuffle();
   state.shuffle = !state.shuffle;
   if (state.context === 'playlist' && state.list.length) reorder();
 
@@ -902,11 +1004,13 @@ export function toggleShuffle() {
 
 /** Whether shuffle is armed, so a page can draw its own control to match. */
 export function isShuffled() {
+  if (HOST) return HOST.isShuffled();
   return state.shuffle;
 }
 
 /** off -> all -> one -> off. */
 export function cycleRepeat() {
+  if (HOST) { HOST.cycleRepeat(); return; }
   const order = ['off', 'all', 'one'];
   state.repeat = order[(order.indexOf(state.repeat) + 1) % order.length];
 
@@ -923,6 +1027,10 @@ export function cycleRepeat() {
 
 /** Stop and put the bar away. The audio is released, not just paused. */
 export function stop() {
+  if (HOST) { HOST.stop(); return; }
+  tick();
+  flushListened();
+  playId = null;
   audio.pause();
   audio.removeAttribute('src');
   // Releases the buffered file rather than leaving the element holding
@@ -945,6 +1053,9 @@ export function stop() {
 /** Whether the bar currently owns the keyboard, so a page's global
     handler can stand aside the way app.js does for the picker. */
 export function isPlayerFocused() {
+  // Focus inside the shell's bar is never inside this page's document,
+  // so a framed page can answer for itself
+  if (HOST) return false;
   return mounted && ui.bar.contains(document.activeElement);
 }
 
@@ -968,7 +1079,10 @@ function saveResume() {
       at: audio.currentTime || 0,
       paused: audio.paused,
       shuffle: state.shuffle,
-      repeat: state.repeat
+      repeat: state.repeat,
+      // So the next page carries on the same play rather than logging
+      // a second one for the same listen
+      playId
     }));
   } catch {
     // Storage refused. The player still works, it just will not
@@ -1024,7 +1138,11 @@ async function restore() {
   ui.repeat.classList.toggle('is-on', state.repeat !== 'off');
   ui.repeat.setAttribute('aria-label', `Repeat: ${state.repeat}`);
 
-  await load(saved.track, { autoplay: !saved.paused, at: Number(saved.at) || 0 });
+  await load(saved.track, {
+    autoplay: !saved.paused,
+    at: Number(saved.at) || 0,
+    resumeId: saved.playId || null
+  });
 }
 
 /* ---------- Events ---------- */
@@ -1094,11 +1212,15 @@ function wire() {
 
   /* ---- The element itself ---- */
   audio.addEventListener('play', () => {
+    lastPos = audio.currentTime || 0;
+    logStart();
     paintPlaying(true);
     saveResume();
   });
 
   audio.addEventListener('pause', () => {
+    tick();
+    flushListened();
     paintPlaying(false);
     saveResume();
   });
@@ -1115,16 +1237,24 @@ function wire() {
       fill(ui.range);
     }
     paintTimes();
+    tick();
 
     const now = Date.now();
     if (now - lastWrite > RESUME_EVERY) {
       lastWrite = now;
       saveResume();
+      flushListened();
     }
   });
 
   audio.addEventListener('ended', () => {
+    tick();
+    flushListened();
+
     if (state.repeat === 'one') {
+      // Around again is another play of the same track
+      playId = null;
+      lastPos = 0;
       audio.currentTime = 0;
       audio.play().catch(() => paintPlaying(false));
       return;
@@ -1161,7 +1291,11 @@ function wire() {
   });
 
   // A navigation is the last chance to record where we were
-  window.addEventListener('pagehide', saveResume);
+  window.addEventListener('pagehide', () => {
+    tick();
+    flushListened();
+    saveResume();
+  });
 
   wireMediaSession();
 }
@@ -1176,6 +1310,8 @@ function wire() {
  * whatever the previous page was playing.
  */
 export function initPlayer() {
+  // Framed: the shell mounted the bar and owns the element already
+  if (HOST) return Promise.resolve();
   mount();
   loadIndex();
   return loadRecent().then(restore);

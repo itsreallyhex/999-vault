@@ -18,6 +18,10 @@ export const REQUEST_TIMEOUT = 12000;
    there is no URL to resolve and no request to time out. See
    tauri.js and the read_catalogue command. */
 
+/** Who the overview greets. One user, one machine, so a constant
+    rather than an account. Empty string for a plain "Hey". */
+export const OWNER = 'Hex';
+
 /** Cards appended per batch. The catalogue runs to a few thousand rows,
     so the grid fills progressively rather than all at once. */
 export const PAGE_SIZE = 60;

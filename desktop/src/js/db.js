@@ -5,11 +5,17 @@
    the only one that touches the network. No DOM, no fetch: it is
    handed plain track objects and returns plain objects back.
 
-   Three stores:
+   Four stores:
 
      playlists  { id, name, note, created, updated }
      items      { id, playlistId, pos, added, ...track snapshot }
      recent     { id, at }
+     plays      { id, rid, t, c, cov, at, sec }
+
+   `plays` is the listening history, one row per track started: what
+   it was, when, and how many seconds of it were actually heard. The
+   overview page on index.html is drawn entirely from this store. It
+   is append-only from the player's side and never trimmed.
 
    `recent` is the player's exclusion queue: the archive record ids
    most recently started, newest last, capped at RECENT_CAP. The
@@ -34,13 +40,15 @@
    ============================================================ */
 
 const DB_NAME = '999-vault';
-/** 2 added the `recent` store. The upgrade only creates what is
-    missing, so a database written by version 1 keeps its playlists. */
-const DB_VERSION = 2;
+/** 2 added the `recent` store, 3 added `plays`. The upgrade only
+    creates what is missing, so a database written by an earlier
+    version keeps everything it had. */
+const DB_VERSION = 3;
 
 const PLAYLISTS = 'playlists';
 const ITEMS = 'items';
 const RECENT = 'recent';
+const PLAYS = 'plays';
 
 /** How many record ids the exclusion queue holds before the oldest
     falls off and becomes pickable again. */
@@ -109,6 +117,12 @@ export function openDb() {
         // Ordered by when it was played, which is what makes the
         // oldest-first trim a plain read of the first few keys.
         recent.createIndex('byAt', 'at');
+      }
+
+      if (!db.objectStoreNames.contains(PLAYS)) {
+        const plays = db.createObjectStore(PLAYS, { keyPath: 'id' });
+        plays.createIndex('byAt', 'at');
+        plays.createIndex('byRid', 'rid');
       }
     };
 
@@ -448,6 +462,62 @@ export function clearRecent() {
   });
 }
 
+/* ---------- Listening history ---------- */
+
+/**
+ * Record that a track was started. Resolves to the row's id, which
+ * the player hands back to addListened() as the seconds go by.
+ *
+ * A snapshot of the track rides along, the same fields a playlist row
+ * keeps, so the overview can draw a most-played list with covers
+ * without reading the catalogue.
+ */
+export function logPlay(track) {
+  if (!track) return Promise.resolve(null);
+
+  const row = {
+    id: uid(),
+    rid: track.rid || null,
+    t: track.t || '',
+    c: track.c || 'main',
+    cov: track.cov || null,
+    at: stamp(),
+    sec: 0
+  };
+
+  return run([PLAYS], 'readwrite', (tx, done) => {
+    tx.objectStore(PLAYS).add(row);
+    done(row.id);
+  });
+}
+
+/** Add seconds actually heard to a play. Read and write in one
+    transaction, so two flushes cannot lose each other's seconds. */
+export function addListened(id, seconds) {
+  if (!id || !(seconds > 0)) return Promise.resolve(false);
+
+  return run([PLAYS], 'readwrite', (tx, done) => {
+    const store = tx.objectStore(PLAYS);
+    store.get(id).onsuccess = (event) => {
+      const row = event.target.result;
+      if (!row) { done(false); return; }
+      row.sec = (row.sec || 0) + seconds;
+      store.put(row);
+      done(true);
+    };
+  });
+}
+
+/** The whole history, oldest first. Small enough to hand over whole:
+    one row per play, and the overview wants all of it anyway. */
+export function allPlays() {
+  return run([PLAYS], 'readonly', (tx, done) => {
+    tx.objectStore(PLAYS).index('byAt').getAll().onsuccess = (event) => {
+      done(event.target.result);
+    };
+  });
+}
+
 /* ---------- Backup ---------- */
 
 /**
@@ -457,7 +527,7 @@ export function clearRecent() {
  * survives that.
  */
 export function exportAll() {
-  return run([PLAYLISTS, ITEMS], 'readonly', (tx, done) => {
+  return run([PLAYLISTS, ITEMS, PLAYS], 'readonly', (tx, done) => {
     tx.objectStore(PLAYLISTS).getAll().onsuccess = (event) => {
       const playlists = event.target.result;
 
@@ -468,21 +538,26 @@ export function exportAll() {
           byList.get(item.playlistId).push(item);
         });
 
-        done({
-          app: DB_NAME,
-          version: DB_VERSION,
-          exported: new Date().toISOString(),
-          playlists: playlists
-            .sort((a, b) => a.created - b.created)
-            .map((p) => ({
-              name: p.name,
-              note: p.note || '',
-              created: p.created,
-              items: (byList.get(p.id) || [])
-                .sort((a, b) => a.pos - b.pos)
-                .map((item) => ({ added: item.added, ...snapshot(item) }))
-            }))
-        });
+        // The history goes along with the lists: it is the other thing
+        // clearing site data would take, and the only copy of it.
+        tx.objectStore(PLAYS).getAll().onsuccess = (e) => {
+          done({
+            app: DB_NAME,
+            version: DB_VERSION,
+            exported: new Date().toISOString(),
+            playlists: playlists
+              .sort((a, b) => a.created - b.created)
+              .map((p) => ({
+                name: p.name,
+                note: p.note || '',
+                created: p.created,
+                items: (byList.get(p.id) || [])
+                  .sort((a, b) => a.pos - b.pos)
+                  .map((item) => ({ added: item.added, ...snapshot(item) }))
+              })),
+            plays: e.target.result.sort((a, b) => a.at - b.at)
+          });
+        };
       };
     };
   });
@@ -498,9 +573,29 @@ export function importAll(payload) {
   const incoming = payload && Array.isArray(payload.playlists) ? payload.playlists : null;
   if (!incoming) return Promise.reject(new Error('That file is not a 999 playlist export'));
 
-  return run([PLAYLISTS, ITEMS], 'readwrite', (tx, done) => {
+  // Older exports carry no history. Rows keep their ids and go in with
+  // put, so importing the same file twice does not double the plays.
+  const plays = Array.isArray(payload.plays) ? payload.plays : [];
+
+  return run([PLAYLISTS, ITEMS, PLAYS], 'readwrite', (tx, done) => {
     const lists = tx.objectStore(PLAYLISTS);
     const items = tx.objectStore(ITEMS);
+    const history = tx.objectStore(PLAYS);
+    let addedPlays = 0;
+
+    plays.forEach((row) => {
+      if (!row || !row.id || !Number.isFinite(Number(row.at))) return;
+      history.put({
+        id: String(row.id),
+        rid: row.rid || null,
+        t: String(row.t || ''),
+        c: String(row.c || 'main'),
+        cov: row.cov || null,
+        at: Number(row.at),
+        sec: Number(row.sec) || 0
+      });
+      addedPlays++;
+    });
 
     lists.getAll().onsuccess = (event) => {
       const taken = new Set(event.target.result.map((p) => p.name));
@@ -545,7 +640,7 @@ export function importAll(payload) {
         });
       });
 
-      done({ playlists: addedLists, items: addedItems });
+      done({ playlists: addedLists, items: addedItems, plays: addedPlays });
     };
   });
 }

@@ -3,11 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#08070C">
   <title>999</title>
   <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/player.css">
   <link rel="stylesheet" href="css/launch.css">
 </head>
-<body class="launch">
+<body class="overview">
+  <a class="skip-link" href="#board">Skip to the overview</a>
+
   <!-- The 999 mark, same shapes the site uses, defined once and pulled in
        by <use>. Parked off screen rather than hidden: an SVG that is not
        rendered stops resolving the gradient below. -->
@@ -27,14 +31,132 @@
     </symbol>
   </svg>
 
-  <main class="launch-in">
-    <div class="launch-mark" aria-hidden="true">
-      <svg class="mark"><use href="#mark999"/></svg>
-    </div>
-    <h1 class="sr-only">999</h1>
-    <p class="launch-deck">The archive, on this machine.</p>
+  <!-- ==================== NAV ==================== -->
+  <nav class="site-nav" aria-label="Primary">
+    <div class="site-nav-in">
+      <a class="brand" href="index.html" aria-label="999, home" aria-current="page">
+        <span class="brand-mark" aria-hidden="true"><svg class="mark"><use href="#mark999"/></svg></span>
+        <span class="brand-text">A Juice WRLD fan project</span>
+      </a>
 
-    <nav class="launch-picks" aria-label="Where to go">
+      <ul class="site-nav-links">
+        <li><a href="vault.html">The Vault</a></li>
+        <li><a href="playlists.html">Playlists</a></li>
+      </ul>
+
+      <a class="btn btn-ghost" href="vault.html">Open the Vault</a>
+    </div>
+  </nav>
+
+  <!-- ==================== HERO ====================
+       The same band the playlists page opens with: artwork on the
+       left, words on the right, the whole thing washed with the
+       palette of the artwork. Here the artwork is the four most
+       played covers and the words are the listening figures. Every
+       number comes out of the plays store; the markup ships zeros. -->
+  <header class="ov-hero" id="ovHero" data-mode="empty">
+    <div class="ov-hero-wash" aria-hidden="true"></div>
+
+    <div class="ov-hero-in wrap">
+      <div class="ov-hero-art" id="ovHeroArt" aria-hidden="true"></div>
+
+      <div class="ov-hero-body">
+        <p class="label">Your listening</p>
+        <h1 class="ov-title" id="greet">Hey</h1>
+        <p class="ov-lede" id="ovLede">
+          Nothing played yet. Press play on anything in the Vault and this
+          page fills in from there.
+        </p>
+
+        <dl class="ov-figs">
+          <div class="hero-fig">
+            <dt class="label">Total plays</dt>
+            <dd id="figPlays">0</dd>
+          </div>
+          <div class="hero-fig">
+            <dt class="label">Time listened</dt>
+            <dd id="figTime">0m</dd>
+          </div>
+          <div class="hero-fig">
+            <dt class="label">Current streak</dt>
+            <dd id="figStreak">0d</dd>
+          </div>
+          <div class="hero-fig">
+            <dt class="label">Unique songs</dt>
+            <dd id="figUnique">0</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== BOARD ==================== -->
+  <main class="ov-board wrap" id="board">
+
+    <!-- ---------- Left: most played, as a tracklist ----------
+         The playlist row classes, on purpose: the rank turns into a
+         play button on hover and the row marks itself while its track
+         plays, exactly as on the playlists page. -->
+    <section class="ov-main" aria-label="Most played">
+      <div class="ov-sec-head">
+        <p class="label">Most played</p>
+        <p class="ov-sec-n mono" id="topN"></p>
+      </div>
+
+      <div class="pl-rows-head ov-top-head" id="topHead" hidden>
+        <span class="pl-h-pos mono">#</span>
+        <span class="pl-h-title">Title</span>
+        <span class="pl-h-cat">Category</span>
+        <span class="pl-h-len">Plays</span>
+        <span class="pl-h-heard">Heard</span>
+      </div>
+
+      <ol class="pl-rows ov-top" id="topRows" hidden></ol>
+
+      <p class="ov-top-empty" id="topEmpty">
+        The tracks you come back to will collect here, most played first.
+        Each one plays again from its row.
+      </p>
+    </section>
+
+    <!-- ---------- Right: three small readings ---------- -->
+    <aside class="ov-side" aria-label="More figures">
+
+      <section class="panel">
+        <p class="label">Archive completion</p>
+        <div class="ring-row">
+          <div class="ring" id="compRing" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <span class="ring-pct" id="compPct">0%</span>
+          </div>
+          <div class="ring-text">
+            <p class="ring-big" id="compPlayed">0</p>
+            <p class="ring-note" id="compNote">of 0 main tracks played</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <p class="label">When you listen</p>
+        <div class="hours" id="hourBars" aria-hidden="true"></div>
+        <div class="hours-axis mono" aria-hidden="true">
+          <span>12am</span><span>6am</span><span>12pm</span><span>6pm</span>
+        </div>
+        <p class="panel-note" id="hourNote">No pattern yet</p>
+      </section>
+
+      <section class="panel">
+        <p class="label">Last two weeks</p>
+        <div class="days" id="dayStrip" aria-hidden="true"></div>
+        <dl class="panel-figs">
+          <div><dt>Best streak</dt><dd id="streakBest">0 days</dd></div>
+          <div><dt>Days played</dt><dd id="daysPlayed">0</dd></div>
+          <div><dt>Plays a day</dt><dd id="avgDaily">0</dd></div>
+        </dl>
+      </section>
+    </aside>
+
+    <!-- ---------- The two doors ---------- -->
+    <nav class="doors" aria-label="Where to go">
       <a class="pick" href="vault.html">
         <span class="pick-name">Open Vault</span>
         <span class="pick-note">Every entry the archive holds. Search, filter and play.</span>
@@ -48,7 +170,7 @@
       </a>
     </nav>
 
-    <p class="launch-status" id="status">Looking for the archive...</p>
+    <p class="ov-status" id="status">Looking for the archive...</p>
   </main>
 
   <script type="module" src="js/launch.js"></script>

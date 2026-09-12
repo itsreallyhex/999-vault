@@ -1,105 +1,250 @@
 /* ============================================================
-   The start screen.
+   The overview.
 
-   Not a port of the site's landing page. That page exists to explain
-   the project to somebody arriving at it; this one exists because an
-   app that opens straight into one of its two halves makes the other
-   half feel like a detour. So: the mark, one line, two doors.
+   Styles for index.html only. Loaded after app.css and player.css and
+   built out of their parts: the hero band and cover mosaic are the
+   playlists page's, the figure tiles are the Vault's, the tracklist
+   rows are the playlists page's (with the play button in the number
+   cell and the now-playing bars from player.css). What is new here is
+   small: a completion ring, a plays-by-hour chart, a fourteen-day
+   strip, and a share bar behind each row.
 
-   Tokens, the reset and the mark itself come from app.css.
+   Depends on app.css tokens: --bg, --bg-2, --bg-3, --line, --line-2,
+   --accent, --accent-2, --dim, --faint, --r, --r-lg, --dur, --ease,
+   the type steps and --gutter. It redefines none of them.
    ============================================================ */
 
-.launch {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 2rem;
+/* ---------- Hero ---------- */
+.ov-hero {
+  position: relative; overflow: hidden;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-2);
+}
+
+/* The band takes the palette of the most played cover, put on --wash
+   by launch.js. Its own layer, so the strength is an opacity rather
+   than a colour function an older engine might not know. */
+.ov-hero-wash {
+  position: absolute; inset: 0; pointer-events: none;
   background:
-    radial-gradient(90rem 50rem at 50% -20%, rgba(139, 92, 246, 0.14), transparent 65%),
-    var(--bg);
+    radial-gradient(105% 130% at 14% 0%, var(--wash, var(--accent)) 0%, transparent 58%),
+    linear-gradient(180deg, var(--wash-2, var(--bg-3)) 0%, transparent 74%);
+  opacity: 0.12;
+  transition: opacity 420ms var(--ease);
+}
+.ov-hero[data-mode="list"] .ov-hero-wash { opacity: 0.34; }
+
+.ov-hero-in {
+  position: relative; z-index: 1;
+  padding-block: clamp(1.75rem, 1.2rem + 2.4vw, 3rem);
+  display: grid; gap: clamp(1.1rem, 0.6rem + 2vw, 2.25rem);
+  align-items: end;
+}
+@media (min-width: 760px) {
+  .ov-hero-in { grid-template-columns: auto minmax(0, 1fr); }
 }
 
-.launch-in {
-  width: min(52rem, 100%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1.4rem;
-  text-align: center;
+.ov-hero-body { min-width: 0; }
+
+.ov-title {
+  font-family: 'Righteous', 'Poppins', sans-serif;
+  font-size: clamp(2rem, 1.1rem + 4.2vw, 4.25rem);
+  line-height: 0.98; letter-spacing: -0.02em;
+  margin: 0.4rem 0 0;
+  /* The Vault hero's gradient text: white into the accent */
+  background: linear-gradient(170deg, #FFFFFF 25%, var(--accent-2) 70%, var(--accent) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  overflow-wrap: anywhere;
+}
+.ov-lede {
+  margin: 0.85rem 0 0; max-width: 52ch;
+  color: var(--dim); line-height: 1.7;
 }
 
-.launch-mark {
-  font-size: 4.6rem;
-  stroke: url(#mark-grad);
+/* Four of the Vault's figure tiles in a row. The headline number is
+   pulled down a step: "1d 15h 46m" is wider than any Vault figure. */
+.ov-figs {
+  margin: 1.4rem 0 0;
+  display: grid; gap: 0.7rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.ov-figs .hero-fig { min-height: 0; }
+.ov-figs .hero-fig dd {
+  font-size: clamp(1.25rem, 0.9rem + 1.2vw, 1.85rem);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-.launch-deck {
-  color: var(--dim);
-  font-size: var(--step-0);
-  margin: 0;
+/* The mosaic: the four most played covers. Same box as the playlists
+   hero, same tilt once there is something in it. */
+.ov-hero-art {
+  width: clamp(148px, 30vw, 236px); aspect-ratio: 1;
+  display: grid; gap: 2px;
+  grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+  border-radius: var(--r-lg); overflow: hidden;
+  background: var(--bg-3);
+  box-shadow: 0 34px 64px -26px rgba(0, 0, 0, 0.95);
+  transition: transform 420ms var(--ease);
+}
+.ov-hero[data-mode="list"] .ov-hero-art { transform: rotate(-1.5deg); }
+.ov-hero-art[data-n="0"],
+.ov-hero-art[data-n="1"] { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+.ov-hero-art[data-n="2"] { grid-template-rows: 1fr; }
+.ov-hero-art[data-n="3"] .mos-cell:first-child { grid-row: span 2; }
+
+/* ---------- Board ---------- */
+.ov-board {
+  display: grid; gap: 1.25rem;
+  padding-block: clamp(1.25rem, 1rem + 1vw, 2rem) 2.5rem;
+}
+@media (min-width: 960px) {
+  .ov-board { grid-template-columns: minmax(0, 1fr) minmax(0, 300px); }
+  .ov-main { grid-column: 1; grid-row: 1; }
+  .ov-side { grid-column: 2; grid-row: 1; }
+  .doors, .ov-status { grid-column: 1 / -1; }
 }
 
-/* Two doors, side by side, collapsing to one column when the window is
-   dragged narrow. */
-.launch-picks {
-  width: 100%;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  margin-top: 0.6rem;
+.ov-sec-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 0.7rem;
+}
+.ov-sec-n { font-size: var(--step--2); color: var(--faint); }
+
+/* ---------- Most played, as rows ----------
+   .pl-rows-head and .pl-row lay the columns out (app.css). The last
+   column, actions on the playlists page, is the time heard here. */
+.pl-h-heard { grid-column: 6; text-align: right; }
+.ov-heard { font-size: var(--step--2); color: var(--faint); text-align: right; }
+
+/* A share bar behind each row: this track's plays against the top
+   one, in the track's own category hue, faint enough to read as a
+   tint. The bar is under the row's own content, not over it. */
+.ov-top-row { position: relative; isolation: isolate; }
+.ov-top-row::before {
+  content: ''; position: absolute; inset: 0 auto 0 0; z-index: -1;
+  width: var(--p, 0%); border-radius: inherit;
+  background: var(--swatch, var(--accent)); opacity: 0.07;
+  transition: width 600ms var(--ease);
+}
+.ov-top-row .pl-alts:empty { display: none; }
+
+.ov-top-empty {
+  padding: 2.5rem 1.25rem; text-align: center;
+  color: var(--faint); font-size: var(--step--1); line-height: 1.7;
+  border: 1px dashed var(--line-2); border-radius: var(--r-lg);
 }
 
-@media (max-width: 640px) {
-  .launch-picks { grid-template-columns: 1fr; }
+/* ---------- The side readings ---------- */
+.ov-side { display: grid; gap: 1rem; align-content: start; }
+
+.panel {
+  background: var(--bg-2); border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 1.1rem 1.25rem 1.2rem;
+  min-width: 0;
+}
+.panel > .label { margin-bottom: 0.9rem; }
+.panel-note { margin: 0.7rem 0 0; color: var(--dim); font-size: var(--step--1); }
+
+/* Completion: a ring, the number beside it */
+.ring-row { display: flex; align-items: center; gap: 1rem; }
+.ring {
+  flex: none; width: 92px; aspect-ratio: 1; border-radius: 50%;
+  position: relative; display: grid; place-items: center;
+  background: conic-gradient(var(--accent) var(--p, 0%), var(--bg-3) 0);
+}
+.ring::before {
+  content: ''; position: absolute; inset: 9px; border-radius: 50%;
+  background: var(--bg-2);
+}
+.ring-pct {
+  position: relative; font-family: 'Righteous', sans-serif;
+  font-size: var(--step-1); font-variant-numeric: tabular-nums;
+}
+.ring-text { min-width: 0; }
+.ring-big {
+  margin: 0; font-family: 'Righteous', sans-serif;
+  font-size: var(--step-2); line-height: 1;
+}
+.ring-note { margin: 0.3rem 0 0; color: var(--dim); font-size: var(--step--1); line-height: 1.5; }
+
+/* Plays by hour: twenty-four bars, the busiest one in the accent */
+.hours {
+  display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); gap: 2px;
+  height: 56px; align-items: end;
+}
+.hours i {
+  display: block; height: max(3px, var(--h, 0%));
+  border-radius: 2px 2px 0 0; background: var(--line-2);
+  transition: height 600ms var(--ease);
+}
+.hours i.is-peak { background: var(--accent); }
+.hours-axis {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  margin-top: 0.35rem; padding-top: 0.35rem; border-top: 1px solid var(--line);
+  font-size: 0.6rem; letter-spacing: 0.08em; color: var(--faint); text-transform: uppercase;
+}
+
+/* The last fourteen days, one square each, today ringed */
+.days { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 4px; }
+.days i {
+  display: block; aspect-ratio: 1; border-radius: 4px;
+  background: var(--bg-3); border: 1px solid var(--line);
+}
+.days i.is-on { background: var(--accent); border-color: var(--accent); }
+.days i.is-today { box-shadow: 0 0 0 1px var(--bg-2), 0 0 0 2px var(--accent-2); }
+
+.panel-figs { display: grid; gap: 0.45rem; margin: 0.9rem 0 0; }
+.panel-figs div { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; }
+.panel-figs dt { color: var(--dim); font-size: var(--step--1); }
+.panel-figs dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ---------- The two doors ---------- */
+.doors {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+  margin-top: 0.25rem;
 }
 
 .pick {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  padding: 1.5rem 1.4rem 1.3rem;
-  text-align: left;
-  text-decoration: none;
-  color: inherit;
+  display: flex; flex-direction: column; gap: 0.45rem;
+  padding: 1.3rem 1.4rem 1.2rem;
+  text-align: left; text-decoration: none; color: inherit;
   background: var(--bg-2);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
-  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+  transition: border-color var(--dur) var(--ease), background-color var(--dur) var(--ease);
 }
-
-.pick:hover,
-.pick:focus-visible {
-  background: var(--bg-3);
-  border-color: var(--accent);
-  transform: translateY(-2px);
-}
-
-.pick-name {
-  font-family: 'Righteous', sans-serif;
-  font-size: var(--step-1);
-}
-
-.pick-note {
-  color: var(--faint);
-  font-size: var(--step--1);
-  line-height: 1.6;
-}
+.pick:hover, .pick:focus-visible { background: var(--bg-3); border-color: var(--accent); }
+.pick-name { font-family: 'Righteous', sans-serif; font-size: var(--step-1); }
+.pick-note { color: var(--faint); font-size: var(--step--1); line-height: 1.6; }
 
 /* Held at a fixed height so the row does not jump when the counts
    arrive a moment after the window paints. */
 .pick-figure {
-  margin-top: 0.35rem;
-  min-height: 1.2em;
+  margin-top: 0.35rem; min-height: 1.2em;
   font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: var(--step--1);
-  color: var(--accent-2);
+  font-size: var(--step--1); color: var(--accent-2);
 }
 
-.launch-status {
-  margin: 0.4rem 0 0;
-  color: var(--faint);
-  font-size: var(--step--1);
-  line-height: 1.6;
+.ov-status {
+  margin: 0;
+  color: var(--faint); font-size: var(--step--2); line-height: 1.6;
+}
+.ov-status[data-state="bad"] { color: var(--c-cut); }
+
+/* ---------- Narrower windows ---------- */
+@media (max-width: 760px) {
+  .ov-hero-in { justify-items: center; text-align: center; }
+  .ov-hero-art { width: min(62vw, 240px); }
+  .ov-lede { margin-inline: auto; }
+  .ov-figs { grid-template-columns: repeat(2, minmax(0, 1fr)); text-align: left; }
+}
+@media (max-width: 600px) {
+  .doors { grid-template-columns: 1fr; }
+  .pl-h-heard, .ov-heard { display: none; }
 }
 
-.launch-status[data-state="bad"] { color: var(--c-cut); }
+@media (prefers-reduced-motion: reduce) {
+  .ov-hero-art, .ov-hero-wash, .ov-top-row::before, .hours i, .pick { transition: none; }
+  .ov-hero[data-mode="list"] .ov-hero-art { transform: none; }
+}
