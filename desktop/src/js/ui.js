@@ -242,23 +242,45 @@ function plusIcon() {
   return svg;
 }
 
-/** The triangle on a card's play button. Filled, not stroked: at 16px
-    an outlined triangle reads as a smudge. */
-function playIcon() {
+/** A filled icon for a card's play button. Filled, not stroked: at
+    16px an outlined triangle reads as a smudge. */
+function solidIcon(cls, d) {
   const ns = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('class', cls);
   svg.setAttribute('viewBox', '0 0 24 24');
   svg.setAttribute('fill', 'currentColor');
   svg.setAttribute('aria-hidden', 'true');
 
   const path = document.createElementNS(ns, 'path');
-  path.setAttribute('d', 'M8 5.14v13.72a1 1 0 0 0 1.5.86l11.14-6.86a1 1 0 0 0 0-1.72L9.5 4.28A1 1 0 0 0 8 5.14z');
+  path.setAttribute('d', d);
   svg.appendChild(path);
   return svg;
 }
 
+const PLAY = 'M8 5.14v13.72a1 1 0 0 0 1.5.86l11.14-6.86a1 1 0 0 0 0-1.72L9.5 4.28A1 1 0 0 0 8 5.14z';
+const PAUSE = 'M7 4h3.4v16H7zM13.6 4H17v16h-3.4z';
+
+/** How long a single click on a card waits before opening the panel,
+    in case a second click is coming. A double click plays the track,
+    and the panel is a modal over the card, so opening on the first
+    click would put the second one on the panel's backdrop instead. */
+const DBL_WAIT = 250;
+
+/** The three bars that sit on the artwork while this card's track is
+    the one playing. The same cue the player bar uses. */
+function eqBars() {
+  const eq = make('span', 'card-now');
+  eq.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < 3; i++) eq.appendChild(make('i'));
+  return eq;
+}
+
 function buildCard(track, onOpen, onAdd, onPlay) {
   const li = make('li', 'cell');
+  // What app.js matches the playing track against, so the mark can be
+  // put on a card without re-running the filter to find it
+  if (track.rid) li.dataset.rid = track.rid;
 
   const btn = make('button', 'card');
   btn.type = 'button';
@@ -277,6 +299,7 @@ function buildCard(track, onOpen, onAdd, onPlay) {
   shot.appendChild(badge);
 
   if (track.len) shot.appendChild(make('span', 'card-len', track.len));
+  shot.appendChild(eqBars());
 
   // Hover overlay carries the detail the card has no room for
   const veil = make('span', 'shot-veil');
@@ -298,7 +321,22 @@ function buildCard(track, onOpen, onAdd, onPlay) {
     track.se ? `Session edit · ${track.sz}` : track.sz));
   btn.appendChild(body);
 
-  btn.addEventListener('click', () => onOpen(track, btn));
+  // One click opens the panel, two play the track. The first click is
+  // held for DBL_WAIT so the second has time to arrive; a keyboard
+  // activation has detail 0 and opens straight away, since Enter
+  // cannot be doubled.
+  let held = null;
+  btn.addEventListener('click', (event) => {
+    if (!onPlay || event.detail === 0) { onOpen(track, btn); return; }
+    if (event.detail === 1) {
+      clearTimeout(held);
+      held = setTimeout(() => { held = null; onOpen(track, btn); }, DBL_WAIT);
+      return;
+    }
+    clearTimeout(held);
+    held = null;
+    if (event.detail === 2) onPlay(track, btn);
+  });
 
   li.appendChild(btn);
 
@@ -308,7 +346,9 @@ function buildCard(track, onOpen, onAdd, onPlay) {
   if (onPlay) {
     const play = make('button', 'card-play');
     play.type = 'button';
-    play.appendChild(playIcon());
+    // Both icons are in it; the cell's is-playing class picks one
+    play.appendChild(solidIcon('ico-play', PLAY));
+    play.appendChild(solidIcon('ico-pause', PAUSE));
     play.appendChild(make('span', 'sr-only', `Play ${track.t}`));
     play.addEventListener('click', () => onPlay(track, play));
     li.appendChild(play);

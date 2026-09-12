@@ -21,8 +21,10 @@ import { make, niceDate, group, seconds, clock } from './utils.js';
 import { buildCover, buildAssignments, coverSpec } from './covers.js';
 import { swatchFor } from './ui.js';
 import {
-  initPlayer, playFromPlaylist, toggleShuffle, isShuffled
+  initPlayer, playFromPlaylist, toggleShuffle, isShuffled,
+  toggle, onPlayback, sameTrack
 } from './player.js';
+import { loadArchive } from './tauri.js';
 import {
   listPlaylists, createPlaylist, updatePlaylist, deletePlaylist,
   itemsIn, removeItem, moveItem, exportAll, importAll
@@ -48,6 +50,10 @@ let currentId = null;
 /** Set while the delete button is armed, so one stray click cannot
     destroy a list. Cleared on a timer. */
 let deleteArmed = null;
+
+/** What the player last reported: the loaded track and whether it is
+    playing. Kept so a redraw can put the mark back without asking. */
+let now = { track: null, playing: false, context: 'vault', playlistId: null };
 
 function say(text) {
   el.plStatus.textContent = text || '';
@@ -95,16 +101,29 @@ const CROSS = 'M6 6l12 12M18 6L6 18';
 
 /** Filled, unlike the others: a stroked triangle at this size reads
     as a smudge rather than a play button. */
-function playIcon() {
+function solidIcon(cls, d) {
   const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('class', cls);
   svg.setAttribute('viewBox', '0 0 24 24');
   svg.setAttribute('fill', 'currentColor');
   svg.setAttribute('aria-hidden', 'true');
 
   const path = document.createElementNS(NS, 'path');
-  path.setAttribute('d', 'M8 5.14v13.72a1 1 0 0 0 1.5.86l11.14-6.86a1 1 0 0 0 0-1.72L9.5 4.28A1 1 0 0 0 8 5.14z');
+  path.setAttribute('d', d);
   svg.appendChild(path);
   return svg;
+}
+
+const PLAY = 'M8 5.14v13.72a1 1 0 0 0 1.5.86l11.14-6.86a1 1 0 0 0 0-1.72L9.5 4.28A1 1 0 0 0 8 5.14z';
+const PAUSE = 'M7 4h3.4v16H7zM13.6 4H17v16h-3.4z';
+
+/** The three bars that stand in for the row number while that row is
+    the one playing. The same cue the player bar uses. */
+function eqBars() {
+  const eq = make('span', 'pl-eq');
+  eq.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < 3; i++) eq.appendChild(make('i'));
+  return eq;
 }
 
 /**
@@ -113,9 +132,17 @@ function playIcon() {
  * The whole list goes to the player, not just the track, because the
  * running order is the point of this context: it needs somewhere to
  * advance to when the track ends.
+ *
+ * The row that is already loaded is the exception: its button shows
+ * a pause icon, so pressing it pauses or resumes rather than starting
+ * the track over. That holds whichever page started it.
  */
 function playAt(index) {
   if (!currentId || !items.length) return;
+  if (now.track && sameTrack(items[index], now.track)) {
+    toggle();
+    return;
+  }
   playFromPlaylist(currentId, items, index);
 }
 
@@ -260,20 +287,34 @@ function buildRow(item, index) {
   const li = make('li', 'pl-row');
   li.style.setProperty('--swatch', swatchFor(item.c));
 
-  li.appendChild(make('span', 'pl-pos mono', String(index + 1).padStart(2, '0')));
-
-  const shot = make('span', 'pl-shot');
-  shot.appendChild(buildCover(item));
+  // The number column does three things in one cell: the number at
+  // rest, the moving bars while this row plays, and a play button on
+  // hover. The three are stacked and the CSS shows one at a time.
+  const pos = make('span', 'pl-pos mono');
+  pos.appendChild(make('span', 'pl-num', String(index + 1).padStart(2, '0')));
+  pos.appendChild(eqBars());
 
   // Safe to nest here, unlike the Vault: a playlist row is an <li> of
   // spans, not a <button>, so this is not a button inside a button.
-  const play = make('button', 'pl-play');
+  // Both icons are in it; the row's is-playing class picks one.
+  const play = make('button', 'pl-go');
   play.type = 'button';
-  play.appendChild(playIcon());
+  play.appendChild(solidIcon('ico-play', PLAY));
+  play.appendChild(solidIcon('ico-pause', PAUSE));
   play.appendChild(make('span', 'sr-only', `Play ${item.t}`));
   play.addEventListener('click', () => playAt(index));
-  shot.appendChild(play);
+  pos.appendChild(play);
+  li.appendChild(pos);
 
+  // Two clicks anywhere on the row play it too, the same as a Vault
+  // card. Not from a button, which has its own meaning.
+  li.addEventListener('dblclick', (event) => {
+    if (event.target.closest('button')) return;
+    playAt(index);
+  });
+
+  const shot = make('span', 'pl-shot');
+  shot.appendChild(buildCover(item));
   li.appendChild(shot);
 
   const body = make('span', 'pl-body');
@@ -339,6 +380,35 @@ function renderRows() {
   el.plRows.hidden = items.length === 0;
   el.plRowsHead.hidden = items.length === 0;
   el.plRowsEmpty.hidden = items.length !== 0;
+
+  // Fresh rows carry no mark, so it goes back on here
+  markPlaying();
+}
+
+/**
+ * Mark the row holding the loaded track.
+ *
+ * Matched on the record, not on where it was started from: a track
+ * playing from the Vault that also sits in this list is still the one
+ * playing, and the point of the mark is to say so. is-current is the
+ * loaded track, playing or paused; is-playing adds the motion.
+ */
+function markPlaying() {
+  const rows = el.plRows.children;
+  items.forEach((item, i) => {
+    const row = rows[i];
+    if (!row) return;
+
+    const cur = Boolean(now.track) && sameTrack(item, now.track);
+    const playing = cur && now.playing;
+    row.classList.toggle('is-current', cur);
+    row.classList.toggle('is-playing', playing);
+    if (cur) row.setAttribute('aria-current', 'true');
+    else row.removeAttribute('aria-current');
+
+    const label = row.querySelector('.pl-go .sr-only');
+    if (label) label.textContent = `${playing ? 'Pause' : 'Play'} ${item.t}`;
+  });
 }
 
 /* ---------- Detail pane ---------- */
@@ -587,6 +657,14 @@ el.plShuffle.addEventListener('click', () => {
   if (on && items.length) playAt(0);
 });
 
+/* The player says when the loaded track or its state changes; the
+   rows follow. Called once on subscribe, so a track resumed from the
+   Vault is marked before anything else happens. */
+onPlayback((snap) => {
+  now = snap;
+  markPlaying();
+});
+
 el.plNewForm.addEventListener('submit', makeList);
 el.plForm.addEventListener('submit', saveMeta);
 el.plEditBtn.addEventListener('click', toggleForm);
@@ -611,6 +689,13 @@ async function boot() {
   // Puts the bar back if a track was playing on the way in from the
   // Vault. Not awaited: the rail should not wait on the audio index.
   initPlayer();
+
+  // The covers are drawn synchronously and resolve through the archive
+  // root, which only Rust knows. The Vault gets it as a side effect of
+  // fetching the catalogue; this page never reads the catalogue, so
+  // without this every mosaic and row drew the generated cover instead
+  // of the artwork on disk. One round trip, cached, null if no archive.
+  await loadArchive();
 
   try {
     await refreshLists();

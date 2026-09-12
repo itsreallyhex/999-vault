@@ -12,7 +12,7 @@
 
    Three things belong to other pages' markup and still live here,
    because they exist only because the player does: .card-play on a
-   Vault card, .pl-play on a playlist row, and the .btn.is-on state
+   Vault card, .pl-go on a playlist row, and the .btn.is-on state
    the playlists hero uses for its shuffle toggle.
    ============================================================ */
 
@@ -359,25 +359,110 @@ body.has-player { padding-bottom: calc(var(--mini-h) + 0.5rem); }
 }
 
 /* ---------- Playlist row ----------
-   Safe to nest inside .pl-shot: a row is an <li> of spans, so this is
-   not a button inside a button. */
-.pl-shot { position: relative; }
+   The number column holds three things stacked in one grid cell: the
+   number, the moving bars, and the play button. At rest the number
+   shows; while the row plays the bars replace it; pointing at the row
+   brings the button up over both. Safe to nest a button here: a row
+   is an <li> of spans, so this is not a button inside a button. */
+.pl-pos { display: grid; align-items: center; justify-items: start; }
+.pl-pos > * { grid-area: 1 / 1; }
+.pl-num, .pl-eq { pointer-events: none; transition: opacity var(--dur) var(--ease); }
 
-.pl-play {
-  position: absolute; inset: 0; display: grid; place-items: center;
-  border: 0; border-radius: inherit; background: rgba(8, 7, 12, 0.62);
+.pl-go {
+  width: 28px; height: 28px; margin-left: -6px;
+  display: grid; place-items: center;
+  border: 0; border-radius: 50%; background: transparent;
   color: var(--text); cursor: pointer;
-  opacity: 0; transition: opacity var(--dur) var(--ease);
+  opacity: 0; transition: opacity var(--dur) var(--ease), background-color var(--dur) var(--ease);
 }
-.pl-play svg { width: 16px; height: 16px; margin-left: 1px; }
+.pl-go svg { width: 16px; height: 16px; margin-left: 1px; }
+.pl-go:hover { background: var(--bg-3); }
 
 /* Invisible, but never out of the tab order: the same reasoning as
-   the row actions next to it. */
-.pl-row:hover .pl-play,
-.pl-play:focus-visible { opacity: 1; }
-.pl-play:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+   the row actions on the other side. */
+.pl-row:hover .pl-go,
+.pl-row:focus-within .pl-go,
+.pl-go:focus-visible { opacity: 1; }
+.pl-row:hover .pl-num, .pl-row:hover .pl-eq,
+.pl-row:focus-within .pl-num, .pl-row:focus-within .pl-eq { opacity: 0; }
+.pl-go:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
 
-@media (hover: none) { .pl-play { opacity: 1; } }
+/* Nothing to hover with on a touch screen, so the button is always up */
+@media (hover: none) {
+  .pl-go { opacity: 1; }
+  .pl-num, .pl-eq { opacity: 0; }
+}
+
+/* ============================================================
+   Now playing, on the other pages
+
+   The row or card holding the loaded track says so. is-current is
+   the loaded track, playing or paused; is-playing adds the motion.
+   app.js and playlists.js put the classes on, told by the player.
+
+   Three cues, the same on both pages: the artwork's ring and the
+   title take the track's category hue, the play button stays up and
+   turns into a pause, and three bars move while sound is coming out.
+   Paused, the bars stand still and the button shows play again, so a
+   stopped track is never drawn as a moving one.
+   ============================================================ */
+
+/* ---- The bars, shared ---- */
+.pl-eq, .card-now {
+  display: none; align-items: flex-end; gap: 2px; height: 14px;
+}
+.pl-eq i, .card-now i {
+  display: block; width: 3px; height: 100%; border-radius: 2px;
+  background: var(--swatch, var(--accent)); transform-origin: bottom;
+  transform: scaleY(0.4);
+}
+.is-playing .pl-eq i,
+.is-playing .card-now i {
+  animation: mini-eq 900ms var(--ease) infinite alternate;
+}
+.is-playing .pl-eq i:nth-child(2),
+.is-playing .card-now i:nth-child(2) { animation-duration: 620ms; }
+.is-playing .pl-eq i:nth-child(3),
+.is-playing .card-now i:nth-child(3) { animation-duration: 1120ms; }
+
+/* ---- Both icons live in the button; the state picks one ---- */
+.pl-go .ico-pause, .card-play .ico-pause { display: none; }
+.is-playing .pl-go .ico-play, .is-playing .card-play .ico-play { display: none; }
+.is-playing .pl-go .ico-pause, .is-playing .card-play .ico-pause { display: block; }
+
+/* ---- Playlist row ---- */
+.pl-row.is-current {
+  background: rgba(139, 92, 246, 0.09);
+  box-shadow: inset 3px 0 0 var(--swatch, var(--accent));
+}
+.pl-row.is-current:hover, .pl-row.is-current:focus-within {
+  background: rgba(139, 92, 246, 0.14);
+}
+.pl-row.is-current .pl-num { opacity: 0; }
+.pl-row.is-current .pl-eq { display: flex; }
+.pl-row.is-current .pl-title-t { color: var(--accent-2); }
+.pl-row.is-current .pl-shot .cover {
+  box-shadow: 0 0 0 1px var(--swatch, var(--accent));
+}
+
+/* ---- Vault card ---- */
+.card-now {
+  position: absolute; left: 0.6rem; bottom: 0.6rem; z-index: 4;
+  height: auto; padding: 0.35rem 0.5rem; border-radius: 999px;
+  background: rgba(6, 5, 9, 0.72);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.card-now i { height: 13px; }
+.cell.is-current .card-now { display: flex; }
+.cell.is-current .card-shot::after {
+  border-color: var(--swatch, var(--accent));
+  box-shadow: inset 0 0 0 1px var(--swatch, var(--accent));
+}
+.cell.is-current .card-title { color: var(--accent-2); }
+.cell.is-current .card-play {
+  opacity: 1; pointer-events: auto;
+  transform: translate(-50%, -50%) scale(1);
+}
 
 /* ---------- The playlists hero shuffle ---------- */
 .btn.is-on {
@@ -440,9 +525,11 @@ body.has-player { padding-bottom: calc(var(--mini-h) + 0.5rem); }
 @media (prefers-reduced-motion: reduce) {
   .mini:not([hidden]) { animation: none; }
   .mini-eq i { animation: none; transform: scaleY(0.7); }
+  .is-playing .pl-eq i,
+  .is-playing .card-now i { animation: none; transform: scaleY(0.7); }
   .mini-wash,
   .mini-btn,
   .mini-play,
   .card-play,
-  .pl-play { transition-duration: 1ms; }
+  .pl-go, .pl-num, .pl-eq { transition-duration: 1ms; }
 }

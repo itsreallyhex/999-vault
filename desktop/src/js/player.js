@@ -233,6 +233,62 @@ try {
   audio.volume = 0.8;
 }
 
+/* ---------- Watchers ----------
+   The pages draw their own "now playing" mark on the row or card that
+   holds the loaded track, and they need telling when that changes.
+   This is the whole of it: a set of callbacks, told on every track
+   change and every play or pause. Nothing here knows what a row is. */
+
+const watchers = new Set();
+
+function snapshot() {
+  return {
+    track: state.track,
+    playing: Boolean(state.track) && !audio.paused,
+    context: state.context,
+    playlistId: state.playlistId,
+    source: state.source
+  };
+}
+
+function notify() {
+  const now = snapshot();
+  watchers.forEach((fn) => {
+    try { fn(now); } catch { /* a page's mark must not take the player down */ }
+  });
+}
+
+/**
+ * Be told whenever the loaded track or the playing state changes.
+ *
+ * Called once straight away with the current state, so a page that
+ * subscribes after a resume marks the right row without waiting for
+ * the next event. Returns the unsubscribe.
+ */
+export function onPlayback(fn) {
+  watchers.add(fn);
+  fn(snapshot());
+  return () => watchers.delete(fn);
+}
+
+/**
+ * Whether two track objects are the same record.
+ *
+ * A Vault card carries the archive's `rid`; a playlist row carries
+ * that plus its own `id`; a row saved before `rid` existed carries
+ * only the `id` and the title; a resumed track is a JSON copy of
+ * whichever it was. So: the record id when both have one, then the
+ * row id, then the title, which is what the audio index falls back
+ * to as well.
+ */
+export function sameTrack(a, b) {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  if (a.rid && b.rid) return a.rid === b.rid;
+  if (a.id && b.id) return a.id === b.id;
+  return normalise(a.t) === normalise(b.t);
+}
+
 /* ---------- Elements ---------- */
 
 const ui = {};
@@ -446,6 +502,7 @@ function paintPlaying(playing) {
   ui.play.appendChild(solid(playing ? PAUSE : PLAY));
   ui.play.setAttribute('aria-label', playing ? 'Pause' : 'Play');
   ui.bar.classList.toggle('is-playing', playing);
+  notify();
 }
 
 /** mm:ss, or a dash while the duration is still unknown. */
@@ -656,6 +713,9 @@ async function load(track, { autoplay = true, at = 0 } = {}) {
   paintTrack();
   paintContext();
   paintOrigin();
+  // The track has changed even though nothing is playing yet: the
+  // pages move their mark now and the play event lights it up.
+  notify();
 
   if (!src) {
     audio.pause();

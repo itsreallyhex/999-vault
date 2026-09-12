@@ -18,7 +18,9 @@ import {
   openLightbox, closeLightbox, isOpen, trapTab, setAddHandler, setPlayHandler
 } from './lightbox.js';
 import { openPicker, isPickerOpen } from './picker.js';
-import { initPlayer, playTrack, setVaultPool } from './player.js';
+import {
+  initPlayer, playTrack, setVaultPool, toggle, onPlayback, sameTrack
+} from './player.js';
 import { SEED } from './seed.js';
 
 /* ---------- State ---------- */
@@ -26,6 +28,10 @@ let data = [];
 let shown = PAGE_SIZE;
 
 const state = { query: '', category: 'all', sort: 'plays', dir: 'desc' };
+
+/** What the player last reported: the loaded track and whether it is
+    playing. Kept so a redraw can put the mark back without asking. */
+let now = { track: null, playing: false, context: 'vault', playlistId: null };
 
 /* ---------- Filter and sort ---------- */
 function matches(track) {
@@ -52,12 +58,45 @@ function visible() {
   return out;
 }
 
+/* ---------- Now playing ---------- */
+
+/**
+ * Mark the card holding the loaded track.
+ *
+ * Cards carry the record id on data-rid, so this is one pass over
+ * what is on screen rather than a second run of the filter. A row
+ * saved before `rid` existed has nothing to match and gets no mark.
+ */
+function markPlaying() {
+  const rid = now.track && now.track.rid;
+  Array.from(el.rows.children).forEach((cell) => {
+    const cur = Boolean(rid) && cell.dataset.rid === rid;
+    const playing = cur && now.playing;
+    cell.classList.toggle('is-current', cur);
+    cell.classList.toggle('is-playing', playing);
+
+    const label = cell.querySelector('.card-play .sr-only');
+    if (label) {
+      label.textContent = `${playing ? 'Pause' : 'Play'} ${label.textContent.replace(/^(Play|Pause) /, '')}`;
+    }
+  });
+}
+
+/** The card's button: a pause on the track that is already loaded,
+    whichever page started it, and a fresh start on anything else. */
+function playCard(track) {
+  if (now.track && sameTrack(track, now.track)) toggle();
+  else playTrack(track);
+}
+
 /* ---------- Draw ---------- */
 function draw(reset) {
   if (reset) shown = PAGE_SIZE;
   const list = visible();
-  renderGrid(list, shown, openLightbox, openPicker, playTrack);
+  renderGrid(list, shown, openLightbox, openPicker, playCard);
   renderCount(list, state);
+  // Fresh cards carry no mark, so it goes back on here
+  markPlaying();
 }
 
 function loadMore() {
@@ -114,6 +153,14 @@ setPlayHandler(playTrack);
    list keeps the filter and sort owned here and re-read on every
    pick, so a chip changed mid-track is honoured by the next one. */
 setVaultPool(visible);
+
+/* The player says when the loaded track or its state changes; the
+   grid follows. Called once on subscribe, so a track resumed from the
+   playlists page is marked as soon as the grid draws. */
+onPlayback((snap) => {
+  now = snap;
+  markPlaying();
+});
 
 document.addEventListener('keydown', (event) => {
   // The picker is a native <dialog>: it closes itself on Escape and
