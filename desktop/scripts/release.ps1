@@ -61,17 +61,20 @@ if ($remoteUrl -notmatch 'github\.com[:/]([^/]+)/([^/.]+)') { throw "origin is n
 $owner = $Matches[1]; $name = $Matches[2]
 
 # ---- 2. The version, in three files ----
-$c = Get-Content $conf -Raw | ConvertFrom-Json
-$c.version = $Version
-($c | ConvertTo-Json -Depth 10) + "`n" | Set-Content $conf -Encoding utf8 -NoNewline
-
-$t = Get-Content $cargo -Raw
-$t = [regex]::Replace($t, '(?m)^version = "[^"]+"', "version = `"$Version`"", 1)
-Set-Content $cargo $t -Encoding utf8 -NoNewline
-
-$p = Get-Content $pkg -Raw | ConvertFrom-Json
-$p.version = $Version
-($p | ConvertTo-Json -Depth 10) + "`n" | Set-Content $pkg -Encoding utf8 -NoNewline
+# Plain text replacement on the one line, not a JSON round trip: PowerShell
+# 5.1's ConvertTo-Json reindents the whole file, and its -Encoding utf8
+# writes a BOM, which serde_json refuses. Written without one.
+$utf8 = New-Object System.Text.UTF8Encoding $false
+function Write-Text($path, $text) { [IO.File]::WriteAllText($path, $text, $utf8) }
+function Set-Version($path, $pattern, $replacement) {
+  $text = Get-Content $path -Raw
+  $new = [regex]::Replace($text, $pattern, $replacement, 1)
+  if ($new -eq $text -and $text -notmatch [regex]::Escape("`"$Version`"")) { throw "No version line found in $path" }
+  Write-Text $path $new
+}
+Set-Version $conf  '(?m)^(\s*"version":\s*")[^"]*(")' "`${1}$Version`${2}"
+Set-Version $cargo '(?m)^version = "[^"]+"'            "version = `"$Version`""
+Set-Version $pkg   '(?m)^(\s*"version":\s*")[^"]*(")' "`${1}$Version`${2}"
 
 Write-Host "version $Version written"
 
@@ -105,19 +108,21 @@ $manifest = [ordered]@{
   }
 }
 $latest = Join-Path $bundle 'latest.json'
-($manifest | ConvertTo-Json -Depth 5) + "`n" | Set-Content $latest -Encoding utf8 -NoNewline
+Write-Text $latest (($manifest | ConvertTo-Json -Depth 5) + "`n")
 Write-Host "wrote latest.json -> $url"
 
 # ---- 5. Commit, push, release ----
 Push-Location $repo
 try {
   git add -- "$conf" "$cargo" "$pkg" (Join-Path $tauri 'Cargo.lock')
-  git commit -q -m "Release $Version"
+  git diff --cached --quiet
+  if ($LASTEXITCODE -ne 0) { git commit -q -m "Release $Version" }
+  else { Write-Host "version was already $Version; nothing to commit" }
   git push origin $branch
   gh release create $tag "$($installer.FullName)" "$sig" "$latest" `
     --repo "$owner/$name" --target $branch --title "999 Vault $Version" --notes $Notes.Trim()
 } finally { Pop-Location }
 
 Write-Host ""
-Write-Host "released $tag: https://github.com/$owner/$name/releases/tag/$tag"
+Write-Host "released ${tag}: https://github.com/$owner/$name/releases/tag/$tag"
 Write-Host "installed copies will offer it the next time they open"
