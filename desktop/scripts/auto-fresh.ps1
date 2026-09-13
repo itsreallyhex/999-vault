@@ -85,6 +85,21 @@ $vcvars = Get-ChildItem "C:\Program Files*\Microsoft Visual Studio\*\*\VC\Auxili
   Select-Object -First 1 -ExpandProperty FullName
 $prefix = if ($vcvars) { "`"$vcvars`" >nul && " } else { "" }
 
+# Name the linker outright rather than trusting PATH order. Claude Code's
+# own environment puts Git's usr\bin first, and three builds in a row
+# (2026-09-13, the first with a crate that had to be linked fresh) picked
+# up Git's coreutils link.exe through npx despite vcvars, failing with
+# "link: extra operand". rustc honours this variable over PATH. vcvars
+# is still run for LIB and INCLUDE.
+$link = Get-ChildItem "C:\Program Files*\Microsoft Visual Studio\*\*\VC\Tools\MSVC\*\bin\Hostx64\x64\link.exe" -ErrorAction SilentlyContinue |
+  Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+if ($link) {
+  $env:CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER = $link
+  Log "linker $link"
+} else {
+  Log "no MSVC link.exe found; trusting PATH"
+}
+
 # 1. Close the running app: a locked exe fails the build.
 Get-Process vault999 -ErrorAction SilentlyContinue | Stop-Process -Force
 
