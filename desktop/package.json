@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tauri dev",
     "build": "tauri build",
+    "fresh": "taskkill /F /IM vault999.exe >nul 2>&1 & tauri build && start \"\" \"src-tauri/target/release/vault999.exe\"",
     "tauri": "tauri"
   },
   "devDependencies": {

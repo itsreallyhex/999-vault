@@ -18,6 +18,10 @@ That makes `src-tauri/target/release/vault999.exe` and two installers under
 `src-tauri/target/release/bundle/` (NSIS and MSI, both `999 Vault_0.1.0`).
 Run any of them. `npm run dev` is only for working on the Rust side.
 
+After a change to the Rust side, `npm run fresh` closes the running app,
+builds, and opens the new one, so the window on screen is never an older
+build than the code.
+
 Needs Rust plus, on Windows, two Visual Studio components: *MSVC v143 - VS
 2022 C++ x64/x86 build tools* and a *Windows 11 SDK*. Run cargo from
 PowerShell, not Git Bash: Git's own `link.exe` shadows the MSVC linker.
