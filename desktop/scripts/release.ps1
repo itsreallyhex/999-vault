@@ -13,11 +13,16 @@
 #      `npx tauri signer generate -p <password>`. Lose them and installed
 #      copies cannot update, only reinstall. The public half is in
 #      tauri.conf.json under plugins.updater.pubkey.
-#   4. Writes latest.json, which the app fetches on launch: the version,
-#      the notes, the date, and the installer's URL and signature.
-#   5. Commits the bump as "Release <version>", pushes the current
+#   4. Commits the bump as "Release <version>", pushes the current
 #      branch, and creates the GitHub release v<version> with the
-#      installer, its .sig and latest.json attached.
+#      installer and its .sig attached.
+#   5. Writes latest.json, which the app fetches on launch: the version,
+#      the notes, the date, and the installer's URL and signature. The
+#      URL is read back from the release, because GitHub renames the
+#      asset (the space becomes a dot), then it is uploaded too.
+#
+# The repo has to be public for any of this to reach an installed copy:
+# the app fetches with no token, and a private repo's assets are 404.
 #
 # Running this is the "push": it pushes and publishes on purpose, which
 # is the one place the never-push rule bends, because the owner typed it.
@@ -92,10 +97,30 @@ $sig = "$($installer.FullName).sig"
 if (-not (Test-Path $sig)) { throw "No signature beside $($installer.Name); was the key set?" }
 Write-Host "built $($installer.Name)"
 
-# ---- 4. latest.json ----
+# ---- 4. Commit, push, release ----
 $tag = "v$Version"
-$assetName = $installer.Name
-$url = "https://github.com/$owner/$name/releases/download/$tag/" + [uri]::EscapeDataString($assetName)
+Push-Location $repo
+try {
+  git add -- "$conf" "$cargo" "$pkg" (Join-Path $tauri 'Cargo.lock')
+  git diff --cached --quiet
+  if ($LASTEXITCODE -ne 0) { git commit -q -m "Release $Version" }
+  else { Write-Host "version was already $Version; nothing to commit" }
+  git push origin $branch
+  gh release create $tag "$($installer.FullName)" "$sig" `
+    --repo "$owner/$name" --target $branch --title "999 Vault $Version" --notes $Notes.Trim()
+  if ($LASTEXITCODE -ne 0) { throw "gh release create failed" }
+} finally { Pop-Location }
+
+# ---- 5. latest.json, after the upload ----
+# GitHub renames assets on upload: the space in "999 Vault_x.y.z_x64-setup.exe"
+# becomes a dot. So the name is read back from the release rather than
+# taken from the file, and the manifest goes up as a second upload.
+# The \" is for PowerShell 5.1, which hands a native command the inner
+# quotes unescaped otherwise, and jq then sees endswith(-setup.exe).
+$assetName = gh release view $tag --repo "$owner/$name" --json assets `
+  --jq '.assets[] | select(.name | endswith(\"-setup.exe\")) | .name'
+if (-not $assetName) { throw "The release has no -setup.exe asset; the upload failed" }
+$url = "https://github.com/$owner/$name/releases/download/$tag/" + [uri]::EscapeDataString($assetName.Trim())
 $manifest = [ordered]@{
   version  = $Version
   notes    = $Notes.Trim()
@@ -109,19 +134,9 @@ $manifest = [ordered]@{
 }
 $latest = Join-Path $bundle 'latest.json'
 Write-Text $latest (($manifest | ConvertTo-Json -Depth 5) + "`n")
+gh release upload $tag "$latest" --repo "$owner/$name" --clobber
+if ($LASTEXITCODE -ne 0) { throw "uploading latest.json failed" }
 Write-Host "wrote latest.json -> $url"
-
-# ---- 5. Commit, push, release ----
-Push-Location $repo
-try {
-  git add -- "$conf" "$cargo" "$pkg" (Join-Path $tauri 'Cargo.lock')
-  git diff --cached --quiet
-  if ($LASTEXITCODE -ne 0) { git commit -q -m "Release $Version" }
-  else { Write-Host "version was already $Version; nothing to commit" }
-  git push origin $branch
-  gh release create $tag "$($installer.FullName)" "$sig" "$latest" `
-    --repo "$owner/$name" --target $branch --title "999 Vault $Version" --notes $Notes.Trim()
-} finally { Pop-Location }
 
 Write-Host ""
 Write-Host "released ${tag}: https://github.com/$owner/$name/releases/tag/$tag"
