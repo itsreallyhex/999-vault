@@ -57,3 +57,67 @@ frame.addEventListener('load', () => {
 });
 
 document.body.prepend(frame);
+
+/* ---------- Live reload ----------
+   watch.rs emits `pages-changed` with the files that moved, relative
+   to the pages folder, when the pages come from a checkout. What to do
+   depends on what changed:
+
+     .css            swap the <link> in place, in whichever document
+                     holds it. No reload, nothing lost, the music plays.
+     the shell's own files (shell.html, shell.js, player.js and what
+     player.js imports, shell.css, player.css)
+                     reload the shell. The player restarts from its
+                     resume snapshot, paused if autoplay is refused.
+     anything else   reload the frame. The player never notices.
+
+   app.css is loaded by the shell as well as the pages, but a stylesheet
+   swap handles it, so it never forces a shell reload. */
+
+const SHELL_FILES = new Set([
+  'shell.html', 'js/shell.js', 'js/player.js',
+  // player.js imports, any of which changes the player's behaviour
+  'js/config.js', 'js/tauri.js', 'js/utils.js', 'js/covers.js', 'js/ui.js', 'js/db.js'
+]);
+
+function swapStylesheet(doc, file) {
+  if (!doc) return false;
+  let hit = false;
+  doc.querySelectorAll('link[rel="stylesheet"]').forEach((link) => {
+    const href = link.getAttribute('href') || '';
+    if (href.split('?')[0] !== file) return;
+    link.setAttribute('href', `${file}?t=${Date.now()}`);
+    hit = true;
+  });
+  return hit;
+}
+
+function onPagesChanged(files) {
+  const css = files.filter((f) => f.endsWith('.css'));
+  const rest = files.filter((f) => !f.endsWith('.css'));
+
+  css.forEach((f) => {
+    swapStylesheet(document, f);
+    try { swapStylesheet(frame.contentDocument, f); } catch { /* not ours to touch */ }
+  });
+
+  if (!rest.length) return;
+  if (rest.some((f) => SHELL_FILES.has(f))) {
+    window.location.reload();
+  } else {
+    try { frame.contentWindow.location.reload(); } catch { window.location.reload(); }
+  }
+}
+
+try {
+  const events = window.__TAURI__ && window.__TAURI__.event;
+  if (events) {
+    events.listen('pages-changed', (event) => {
+      const files = Array.isArray(event.payload) ? event.payload : [];
+      if (files.length) onPagesChanged(files);
+    });
+  }
+} catch {
+  // No bridge: a plain browser, or a build without the watcher. Ctrl+R
+  // still works.
+}

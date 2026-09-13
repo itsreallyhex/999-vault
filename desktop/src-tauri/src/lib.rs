@@ -14,6 +14,7 @@ mod paths;
 mod presence;
 mod settings;
 mod tools;
+mod watch;
 
 /// Build the app and run it. main.rs is a one-line wrapper around this.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -40,6 +41,9 @@ pub fn run() {
                     Some(dir) => println!("999: pages     {}  (found by: {})", dir.to_string_lossy(), pages.source),
                     None => println!("999: pages     not found. Set pages_dir in the config file, or NINE_PAGES_DIR."),
                 }
+                // An edit to a page reloads the window on its own, when
+                // the pages are the kind that get edited.
+                println!("999: watch     {}", watch::start(handle, &pages));
             }
             if root.exists {
                 println!("999: archive   {}  (found by: {})", root.path, root.source);

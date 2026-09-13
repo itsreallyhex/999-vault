@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"$CLAUDE_PROJECT_DIR/desktop/scripts/auto-fresh.ps1\"",
+            "timeout": 30,
+            "statusMessage": "Checking whether the desktop app needs a rebuild"
+          }
+        ]
+      }
+    ]
+  }
+}

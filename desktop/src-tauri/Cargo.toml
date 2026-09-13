@@ -27,6 +27,9 @@ toml_edit = "0.22"
 # The native folder picker behind Settings > Data folder. Called from
 # an async command so its blocking dialog never sits on the main thread.
 rfd = "0.15"
+# Watches the pages folder so an edit reloads the window by itself.
+# Only started when the pages come from a checkout. See watch.rs.
+notify = "8"
 # Discord Rich Presence over the local IPC pipe. Pure Rust, no native
 # blob; a missing Discord is an ordinary connect error. See presence.rs.
 discord-rich-presence = "1"
