@@ -48,18 +48,24 @@
   --dur:  220ms;
 
   --z-sticky: 10;
-  --z-nav:    20;
   --z-modal:  50;
 
-  /* Height of the shared top bar. The Vault's controls bar is also sticky,
-     so it offsets by this or it slides underneath the nav and disappears. */
-  --nav-h: 60px;
+  /* Height of whatever is pinned above the page. The Vault's controls bar
+     and the playlist side panel are sticky and offset by this. There is no
+     top bar on the desktop, the sidebar is beside the page, so it is 0;
+     the rules that read it are kept so a bar could come back. */
+  --nav-h: 0px;
 
   color-scheme: dark;
 }
 
 /* ---------- Reset ---------- */
 *, *::before, *::after { box-sizing: border-box; }
+/* The pages scroll inside the shell's frame, and the frame's scrollbar
+   was a grey strip between the page and the sidebar. The wheel and the
+   keys still scroll; only the bar is gone. */
+html { scrollbar-width: none; }
+html::-webkit-scrollbar { display: none; }
 [hidden] { display: none !important; }
 html {
   /* Unprefixed too: without it Chrome on Android applies font boosting and
@@ -110,26 +116,10 @@ img { display: block; max-width: 100%; }
 
 /* ============================================================
    SHARED CHROME
-   Used by both index.html and vault.html. Kept here rather than in
-   home.css so the two pages cannot end up with different navigation.
+   The pages carry no navigation of their own on the desktop: the
+   sidebar lives in shell.html, outside the frame, and its styles are
+   in shell.css. What is shared here is the mark and the buttons.
    ============================================================ */
-.site-nav {
-  position: sticky; top: 0; z-index: var(--z-nav);
-  background: rgba(8, 7, 12, 0.82);
-  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  border-bottom: 1px solid var(--line);
-}
-.site-nav-in {
-  max-width: var(--shell, 1240px); margin-inline: auto;
-  padding: 0.7rem var(--gutter);
-  min-height: var(--nav-h);
-  display: flex; align-items: center; gap: 1.25rem;
-}
-
-.brand {
-  display: inline-flex; align-items: baseline; gap: 0.6rem;
-  text-decoration: none; color: inherit; margin-right: auto;
-}
 /* ---------- The 999 mark ----------
    Three stroked nines, drawn rather than typed. Each page carries one
    copy in a <svg class="mark-defs"> sprite near the top of <body> and
@@ -155,25 +145,11 @@ img { display: block; max-width: 100%; }
   stroke-width: 3.2;
 }
 
+/* The mark in the page footers */
 .brand-mark {
   display: block; font-size: 1.2rem;
   stroke: url(#mark-grad);
 }
-.brand-text {
-  font-size: var(--step--1); color: var(--dim);
-  transition: color var(--dur) var(--ease);
-}
-.brand:hover .brand-text { color: var(--text); }
-
-.site-nav-links { display: none; gap: 1.5rem; }
-@media (min-width: 940px) { .site-nav-links { display: flex; } }
-.site-nav-links a {
-  color: var(--dim); text-decoration: none; font-size: var(--step-0);
-  transition: color var(--dur) var(--ease);
-}
-.site-nav-links a:hover { color: var(--text); }
-/* Marks the page you are already on, so the bar says where you are */
-.site-nav-links a[aria-current="page"] { color: var(--text); }
 
 /* ---------- Buttons ---------- */
 .btn {
@@ -1218,8 +1194,6 @@ img { display: block; max-width: 100%; }
   .hero-fig { min-height: 74px; padding: 0.75rem 0.85rem; gap: 0.3rem; }
   .hero-fig dd { font-size: var(--step-2); }
 
-  .site-nav-in { gap: 0.75rem; }
-  .brand-text { display: none; }
   .btn { padding-inline: 0.9rem; font-size: var(--step--1); }
   .foot-in { gap: 1.5rem; }
   .hero-strip { padding-block: 0.4rem; }

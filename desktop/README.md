@@ -80,10 +80,21 @@ while it does. Next prefers files on disk and streams only when the current
 filter has none. One click on a Vault card opens the detail panel, two play
 it.
 
-**The player** lives outside the pages, so switching tabs does not stop the
-music.
+**The sidebar** on the left is how you move between the pages, with
+Settings at the bottom. It lives outside the pages
+with the player, so it never reloads.
 
-**Settings**, from the nav, for the things a person would otherwise have to
+**The player** lives outside the pages, so switching tabs does not stop the
+music. Close the app and open it again and the bar comes back on the
+track you were on, at the same position, paused: press play to carry on.
+Three things on the bar reach past it: pressing the artwork opens
+the track in the Vault, with its alternate titles and the rest; the plus
+adds it to a playlist; the arrow saves a streamed track to the archive
+folder, through the archive's metered download (500 a day for anyone
+without an account), so the next play comes off disk. The arrow only
+shows for a track that is not on this machine yet.
+
+**Settings**, from the sidebar, for the things a person would otherwise have to
 edit in a file: whether songs come from the files on this machine first or
 from the archive first (local first is the default; stream first plays from
 the archive and falls back to the file if the archive fails), whether
@@ -114,7 +125,8 @@ Settings.
 
 ```text
 src/
-  shell.html      The window. Holds the player; shows the pages in a frame.
+  shell.html      The window. Holds the sidebar and the player; shows the
+                  pages in a frame.
   index.html      The overview.
   vault.html
   playlists.html
@@ -135,12 +147,14 @@ diverged.
 
 ## Not done
 
-- The Vault, the now-playing mark and the double click are proved in jsdom
-  only; not yet seen in the window.
+- **Songs stream by default.** A fresh install holds no audio; every play
+  comes from the archive over the network until you save it. Saving is
+  one track at a time, from the arrow on the bar, and counts against the
+  archive's 500 downloads a day. There is no bulk download in the app; the
+  whole archive is still `save-audio.py`, which needs Python and a token.
 - The catalogue a fresh install starts from is the one the installer was
   built with. Refreshing it still needs `sync.py`, which needs Python.
 - The audio index loads once per launch. Run `save-audio.py` with the app
   closed, or restart it.
 - `run_tool` can run the Python scripts but nothing in the interface calls
   it. Python has to be on PATH.
-- An old `999_0.1.0_x64-setup.exe` still sits in `bundle/nsis/`. Delete it.

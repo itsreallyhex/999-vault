@@ -235,6 +235,35 @@ async function boot() {
   renderStrip(data);
   renderChips(data, state, selectCategory);
   draw(true);
+  openFromUrl();
+}
+
+/**
+ * vault.html?rid=<id> opens that record's panel; ?q=<text> runs a
+ * search. The shell sends both when the artwork in the bar is pressed,
+ * so a track whose id is not in this catalogue still lands on its
+ * title. The query is dropped from the URL once read, so a reload of
+ * the frame does not open the panel again.
+ */
+function openFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const rid = params.get('rid');
+  const q = params.get('q');
+  if (!rid && !q) return;
+
+  try { window.history.replaceState(null, '', window.location.pathname); } catch { /* fine */ }
+
+  const hit = rid ? data.find((t) => t.rid === rid) : null;
+  if (hit) {
+    openLightbox(hit);
+    return;
+  }
+  if (q) {
+    el.search.value = q;
+    el.searchRow.classList.add('has-value');
+    state.query = q.trim().toLowerCase();
+    draw(true);
+  }
 }
 
 boot();

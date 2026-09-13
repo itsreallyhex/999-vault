@@ -33,3 +33,7 @@ notify = "8"
 # Discord Rich Presence over the local IPC pipe. Pure Rust, no native
 # blob; a missing Discord is an ordinary connect error. See presence.rs.
 discord-rich-presence = "1"
+# The bar's download button: one track through the metered
+# /music/download into the archive folder. Small, blocking, rustls;
+# it runs on a worker thread. See download.rs.
+ureq = "2"

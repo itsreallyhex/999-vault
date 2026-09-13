@@ -217,7 +217,7 @@ pub fn data_root(app: AppHandle) -> DataRoot {
     }
 }
 
-fn read_json(app: &AppHandle, name: &str) -> Result<serde_json::Value, String> {
+pub fn read_json(app: &AppHandle, name: &str) -> Result<serde_json::Value, String> {
     let (root, source) = resolve(app);
     if root.as_os_str().is_empty() {
         return Err(format!("no archive folder found ({})", source));

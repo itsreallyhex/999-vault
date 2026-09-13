@@ -118,6 +118,10 @@ body.has-player { padding-bottom: calc(var(--mini-h) + 0.5rem); }
   box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--swatch);
 }
 .mini-shot .cover { width: 100%; height: 100%; }
+/* It is a button: pressing the artwork opens the record in the Vault */
+.mini-shot { padding: 0; background: none; cursor: pointer; font: inherit; color: inherit; }
+.mini-shot:hover { border-color: rgba(255, 255, 255, 0.35); }
+.mini-shot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .mini-text { display: flex; flex-direction: column; min-width: 0; gap: 0.15rem; }
 
@@ -289,6 +293,11 @@ body.has-player { padding-bottom: calc(var(--mini-h) + 0.5rem); }
 
 .mini-close:hover { color: var(--c-cut); background: rgba(251, 113, 133, 0.12); }
 
+/* Save to this machine: the arrow pulses while the bytes come down */
+.mini-save.is-busy { color: var(--accent-2); }
+.mini-save.is-busy svg { animation: mini-pulse 1s ease-in-out infinite; }
+@keyframes mini-pulse { 50% { opacity: 0.3; } }
+
 /* ---------- Nothing on disk ----------
    The record is in the catalogue but the file was never pulled. The
    bar stays up and says so rather than vanishing. */
@@ -298,7 +307,18 @@ body.has-player { padding-bottom: calc(var(--mini-h) + 0.5rem); }
 
 /* The "via API" label. Visible text on purpose: an icon would be missed,
    and the point is that it cannot be. Hidden by the [hidden] rule in
-   app.css whenever the source is the disk. */
+   app.css whenever the source is the disk. .mini-note is the same
+   shape in a quieter voice: saving, saved, or why not. */
+.mini-note {
+  align-self: flex-start;
+  margin-top: 0.1rem;
+  padding: 0.1rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: var(--step--2);
+  color: var(--dim);
+  white-space: nowrap;
+}
 .mini-origin {
   align-self: flex-start;
   margin-top: 0.1rem;

@@ -3,12 +3,14 @@
 //! The window is a webview over the same archive the site reads. What
 //! Rust owns is everything the webview cannot do for itself: finding the
 //! archive on disk, reading the two JSON indexes out of it, serving the
-//! pages themselves off disk, running the Python scripts, and talking
-//! to Discord's local pipe.
+//! pages themselves off disk, running the Python scripts, saving one
+//! track into the archive, and talking to Discord's local pipe.
 
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 mod data;
+mod download;
+mod files;
 mod pages;
 mod paths;
 mod presence;
@@ -89,6 +91,8 @@ pub fn run() {
             data::data_root,
             data::read_catalogue,
             data::read_audio_index,
+            download::download_track,
+            files::save_text,
             tools::tools_status,
             tools::run_tool,
             presence::presence_set,

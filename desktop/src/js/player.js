@@ -24,18 +24,20 @@
                shuffle is on.
 
    The 200-id exclusion queue lives in IndexedDB because it has to
-   survive a reload. Volume does not, and lives in localStorage. The
-   resume snapshot lives in sessionStorage: these are separate pages,
-   not routes, so an <audio> element cannot survive a navigation and
-   the state is rebuilt on the other side instead.
+   survive a reload. Volume does not, and lives in localStorage. So
+   does the resume snapshot: the app opens on whatever was playing
+   when it was closed, at the same position, paused. Under the shell
+   the element outlives a page navigation; the snapshot is for the
+   shell reloading and for the next launch.
    ============================================================ */
 
 import { API_BASE } from './config.js';
-import { invoke, loadArchive, resolveAudio, inTauri } from './tauri.js';
+import { invoke, loadArchive, refreshArchive, resolveAudio, inTauri } from './tauri.js';
 import { make, clock } from './utils.js';
 import { buildCover, coverSpec } from './covers.js';
 import { swatchFor } from './ui.js';
 import { pushRecent, recentIds, itemsIn, logPlay, addListened } from './db.js';
+import { openPicker } from './picker.js';
 
 /* The audio index and the audio folder used to be URLs resolved against
    this module, which worked because a server was serving them. There is
@@ -66,9 +68,16 @@ const HOST = (() => {
     home for it. Nothing that must be reliable goes here. */
 const VOL_KEY = '999:volume';
 
-/** The resume snapshot. sessionStorage, not localStorage: it is scoped
-    to this tab and is meant to die with it. */
+/** The resume snapshot. localStorage on the desktop, since 2026-09-13:
+    the owner wants the app to open on whatever was playing when it
+    was closed, at the same position. The site's copy keeps this in
+    sessionStorage, scoped to the tab. */
 const RESUME_KEY = '999:nowplaying';
+
+/** Set once the shell has restored, and gone when the process is.
+    sessionStorage dies with the window in WebView2, so its absence
+    is how a cold start is told from a reload of the shell. */
+const WARM_KEY = '999:warm';
 
 /**
  * Below this many unplayed tracks in the current filtered set, the
@@ -82,8 +91,10 @@ const RESUME_KEY = '999:nowplaying';
 const MIN_FRESH = 12;
 
 /** How often the resume snapshot is written while playing, in ms.
-    Every timeupdate would be four writes a second for no benefit. */
-const RESUME_EVERY = 3000;
+    Every timeupdate would be four writes a second; once a second is
+    what makes the position on the next launch the position at the
+    close, give or take under a second. */
+const RESUME_EVERY = 1000;
 
 /* ---------- Audio index ---------- */
 
@@ -562,6 +573,8 @@ const REPEAT = ['M17 2l4 4-4 4', 'M3 11v-1a4 4 0 0 1 4-4h14', 'M7 22l-4-4 4-4', 
 const VOL = ['M11 5L6 9H2v6h4l5 4V5z', 'M15.5 8.5a5 5 0 0 1 0 7', 'M18.5 5.5a9 9 0 0 1 0 13'];
 const MUTE = ['M11 5L6 9H2v6h4l5 4V5z', 'M22 9l-6 6', 'M16 9l6 6'];
 const CROSS = 'M6 6l12 12M18 6L6 18';
+const SAVE = ['M12 4v11', 'M7 10l5 5 5-5', 'M4 19h16'];
+const PLUS = ['M12 5v14', 'M5 12h14'];
 
 /** An icon-only button, labelled for anyone not looking at it. */
 function control(cls, label, svg) {
@@ -597,7 +610,11 @@ function mount() {
   /* ---- Identity ---- */
   const who = make('div', 'mini-who');
 
-  ui.shot = make('span', 'mini-shot');
+  // A button: pressing the artwork opens the record in the Vault.
+  // The shell listens for the event; a bare page ignores it.
+  ui.shot = make('button', 'mini-shot');
+  ui.shot.type = 'button';
+  ui.shot.setAttribute('aria-label', 'Show this track in the Vault');
   who.appendChild(ui.shot);
 
   const text = make('span', 'mini-text');
@@ -607,9 +624,14 @@ function mount() {
   // track is coming over the network rather than from disk.
   ui.origin = make('span', 'mini-origin', 'via API');
   ui.origin.hidden = true;
+  // One line of feedback for the buttons on the right: saving,
+  // saved, or why not. Clears itself.
+  ui.note = make('span', 'mini-note');
+  ui.note.hidden = true;
   text.appendChild(ui.title);
   text.appendChild(ui.sub);
   text.appendChild(ui.origin);
+  text.appendChild(ui.note);
   who.appendChild(text);
 
   // Three bars that move while the audio does. Purely a state cue,
@@ -666,8 +688,18 @@ function mount() {
 
   bar.appendChild(mid);
 
-  /* ---- Volume and dismiss ---- */
+  /* ---- Add, save, volume and dismiss ---- */
   const side = make('div', 'mini-side');
+
+  ui.add = control('mini-btn mini-add', 'Add to a playlist', icon(...PLUS));
+  ui.add.hidden = true;
+  side.appendChild(ui.add);
+
+  // Shown only for a track that is not on this machine. Hidden, not
+  // disabled, once it is: there is nothing left for it to do.
+  ui.save = control('mini-btn mini-save', 'Save to this machine', icon(...SAVE));
+  ui.save.hidden = true;
+  side.appendChild(ui.save);
 
   ui.mute = control('mini-btn mini-vol-btn', 'Mute', icon(...VOL));
   side.appendChild(ui.mute);
@@ -780,6 +812,88 @@ function paintTrack() {
     ? `Playing ${track.t} from the archive, not from this machine`
     : `Playing ${track.t}`;
   setMediaSession(track);
+  paintSide();
+}
+
+/* ---------- Add and save ---------- */
+
+/** The record id of the save in flight, or null. */
+let saving = null;
+let noteTimer = null;
+
+/** The feedback line under the title. Empty clears it at once;
+    anything else clears itself after a few seconds. */
+function note(text) {
+  if (!ui.note) return;
+  clearTimeout(noteTimer);
+  ui.note.textContent = text || '';
+  ui.note.hidden = !text;
+  if (text) noteTimer = setTimeout(() => { ui.note.hidden = true; }, 5000);
+}
+
+/**
+ * Which of the two side buttons apply to the loaded track. Add wants a
+ * track; save wants a record id, a Rust side to save through, and no
+ * file on disk yet. load() awaits loadIndex() before painting, so
+ * byId is settled by the time this reads it.
+ */
+function paintSide() {
+  if (!ui.add) return;
+  const track = state.track;
+  ui.add.hidden = !track;
+  const wanted = Boolean(track && track.rid && inTauri && !byId.has(track.rid));
+  // Kept up while its own save is in flight, so the busy state is
+  // visible even though the index may already know the file.
+  const busy = Boolean(saving && track && saving === track.rid);
+  ui.save.hidden = !wanted && !busy;
+}
+
+/**
+ * Save the loaded track into the archive folder through Rust, then
+ * teach the in-memory index about it so the next play is local and
+ * hasAudio() answers true. The track keeps streaming if it was: a
+ * switch mid-play would be a hiccup for nothing.
+ */
+async function saveTrack() {
+  const track = state.track;
+  if (!track || !track.rid || saving) return;
+
+  saving = track.rid;
+  ui.save.disabled = true;
+  ui.save.classList.add('is-busy');
+  ui.save.setAttribute('aria-label', 'Saving to this machine');
+  note('Saving to this machine');
+
+  try {
+    const saved = await invoke('download_track', { rid: track.rid });
+    byId.set(saved.rid, saved.file);
+    const stem = saved.file.replace(/\s*\[[0-9a-f]{8}\]\.[^.]+$/i, '');
+    const key = normalise(stem);
+    if (key && !byTitle.has(key)) byTitle.set(key, saved.rid);
+    // Rust's reply about the folder carried audio: false until now
+    await refreshArchive();
+    note(saved.already ? 'Already saved on this machine' : 'Saved to this machine');
+    ui.status.textContent = `${track.t} saved to this machine`;
+  } catch (err) {
+    note((err && err.message) || String(err) || 'Could not save it');
+  } finally {
+    saving = null;
+    ui.save.disabled = false;
+    ui.save.classList.remove('is-busy');
+    ui.save.setAttribute('aria-label', 'Save to this machine');
+    paintSide();
+  }
+}
+
+/** Pressing the artwork: hand the record to whoever is listening.
+    Under the shell that is shell.js, which sends the frame to the
+    Vault with the id; the Vault opens the panel. */
+function openTrack() {
+  const track = state.track;
+  if (!track) return;
+  document.dispatchEvent(new CustomEvent('nine:open-track', {
+    detail: { rid: track.rid || null, title: track.t }
+  }));
 }
 
 function paintContext() {
@@ -1206,6 +1320,8 @@ export function stop() {
     ui.bar.hidden = true;
     paintOrigin();
     paintPlaying(false);
+    paintSide();
+    note('');
   }
   document.body.classList.remove('has-player');
   clearResume();
@@ -1232,7 +1348,7 @@ let lastWrite = 0;
 function saveResume() {
   if (!state.track) return;
   try {
-    sessionStorage.setItem(RESUME_KEY, JSON.stringify({
+    localStorage.setItem(RESUME_KEY, JSON.stringify({
       // The snapshot travels with it, so the next page can draw the
       // bar without the catalogue. playlists.html never reads it.
       track: state.track,
@@ -1248,26 +1364,33 @@ function saveResume() {
     }));
   } catch {
     // Storage refused. The player still works, it just will not
-    // survive the next navigation.
+    // survive the next launch.
   }
 }
 
 function clearResume() {
-  try { sessionStorage.removeItem(RESUME_KEY); } catch { /* refused */ }
+  try { localStorage.removeItem(RESUME_KEY); } catch { /* refused */ }
 }
 
 /**
- * Pick up where the last page left off.
+ * Pick up where the last launch, or the last reload, left off.
  *
- * Autoplay is attempted only if it was playing, and a refusal is
- * expected: the click that started it belonged to the page before
- * this one, so the gesture does not carry over. Failing lands on a
- * loaded, seeked, paused track, which is one keypress from right.
+ * On a reload of the shell, autoplay is attempted if it was playing,
+ * and a refusal is expected: the click that started it belonged to
+ * the document before this one, so the gesture does not carry over.
+ * Failing lands on a loaded, seeked, paused track, one keypress from
+ * right. On a cold start of the app it is not attempted at all: the
+ * bar comes up with the last track at the position it was closed on,
+ * paused, and the play button carries on from there. An app that
+ * starts making sound on its own is not what was asked for.
  */
 async function restore() {
   let saved = null;
+  let warm = false;
   try {
-    saved = JSON.parse(sessionStorage.getItem(RESUME_KEY) || 'null');
+    saved = JSON.parse(localStorage.getItem(RESUME_KEY) || 'null');
+    warm = sessionStorage.getItem(WARM_KEY) === '1';
+    sessionStorage.setItem(WARM_KEY, '1');
   } catch {
     saved = null;
   }
@@ -1301,7 +1424,7 @@ async function restore() {
   ui.repeat.setAttribute('aria-label', `Repeat: ${state.repeat}`);
 
   await load(saved.track, {
-    autoplay: !saved.paused,
+    autoplay: warm && !saved.paused,
     at: Number(saved.at) || 0,
     resumeId: saved.playId || null
   });
@@ -1318,6 +1441,11 @@ function wire() {
   ui.shuffle.addEventListener('click', toggleShuffle);
   ui.repeat.addEventListener('click', cycleRepeat);
   ui.close.addEventListener('click', stop);
+  ui.save.addEventListener('click', saveTrack);
+  ui.add.addEventListener('click', () => {
+    if (state.track) openPicker(state.track, ui.add);
+  });
+  ui.shot.addEventListener('click', openTrack);
 
   /* ---- Seeking ----
      While a drag is in flight the element must not fight the reader
@@ -1460,12 +1588,19 @@ function wire() {
     paintPlaying(false);
   });
 
-  // A navigation is the last chance to record where we were
-  window.addEventListener('pagehide', () => {
+  // A navigation, or the window closing, is the last chance to record
+  // where we were. Both are listened for: which of them WebView2 fires
+  // on the way out has not been measured, and the timeupdate write
+  // above is at most a second behind either way.
+  const last = () => {
     tick();
     flushListened();
     saveResume();
-  });
+  };
+  window.addEventListener('pagehide', last);
+  window.addEventListener('beforeunload', last);
+  // A seek is a position worth keeping straight away
+  audio.addEventListener('seeked', saveResume);
 
   wireMediaSession();
 }

@@ -24,7 +24,7 @@ import {
   initPlayer, playFromPlaylist, toggleShuffle, isShuffled,
   toggle, onPlayback, sameTrack
 } from './player.js';
-import { loadArchive } from './tauri.js';
+import { loadArchive, invoke, inTauri } from './tauri.js';
 import {
   listPlaylists, createPlaylist, updatePlaylist, deletePlaylist,
   itemsIn, removeItem, moveItem, exportAll, importAll
@@ -609,12 +609,24 @@ async function doExport() {
       return;
     }
 
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const name = `999-playlists-${payload.exported.slice(0, 10)}.json`;
+    const text = JSON.stringify(payload, null, 2);
+
+    // The webview drops an <a download> click without a word, so under
+    // Tauri the text goes to Rust and a native Save As dialog asks where.
+    // The blob path below is the site's, kept for a bare browser.
+    if (inTauri) {
+      const path = await invoke('save_text', { name, text });
+      say(path ? `Exported ${group(payload.playlists.length)} playlists to ${path}` : 'Export cancelled');
+      return;
+    }
+
+    const blob = new Blob([text], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
 
     const a = document.createElement('a');
     a.href = url;
-    a.download = `999-playlists-${payload.exported.slice(0, 10)}.json`;
+    a.download = name;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -708,3 +720,15 @@ async function boot() {
 }
 
 boot();
+
+// The bar's add dialog lives in the shell, outside this page, so a
+// track added there is not seen here until asked. The shell raises
+// this on the frame's window when that dialog closes.
+window.addEventListener('playlists-changed', async () => {
+  try {
+    await refreshLists();
+    if (currentId) await select(currentId); else renderPane();
+  } catch (err) {
+    say(err.message || 'Playlists could not be re-read');
+  }
+});

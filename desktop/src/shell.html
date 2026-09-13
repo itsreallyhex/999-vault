@@ -10,13 +10,98 @@
   <link rel="stylesheet" href="css/shell.css">
 </head>
 <body class="shell">
-  <!-- The window opens here. This page owns the player bar and the
-       <audio> element and nothing else; the overview, the Vault and the
-       playlists are shown in the frame shell.js creates below, so a
-       navigation between them never touches the element and the sound
-       never stops. There is no markup for the frame or the bar: the
-       script makes both, in that order, so the page inside the frame
-       finds the player already there. -->
+  <!-- The window opens here. This page owns the sidebar, the player bar
+       and the <audio> element; the overview, the Vault, the playlists
+       and the settings are shown in the frame shell.js creates below,
+       so a navigation between them never touches the element and the
+       sound never stops. The sidebar is the only markup: the frame and
+       the bar are made by the script, in that order, so the page inside
+       the frame finds the player already there. -->
+
+  <!-- The 999 mark, for the brand at the top of the sidebar. Same sprite
+       every page carries; parked off screen rather than hidden so the
+       gradient keeps resolving. -->
+  <svg class="mark-defs" aria-hidden="true" focusable="false">
+    <linearGradient id="mark-grad" gradientUnits="userSpaceOnUse" x1="4" y1="10" x2="44" y2="38">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset=".55" stop-color="#C4B5FD"/>
+      <stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <symbol id="mark999" viewBox="0 10 48 28" fill="none" stroke-linecap="round">
+      <circle cx="9.5" cy="19" r="5.5"/>
+      <path d="M15 19 V28.5 Q15 34.5 9 34.5"/>
+      <circle cx="24" cy="19" r="5.5"/>
+      <path d="M29.5 19 V28.5 Q29.5 34.5 23.5 34.5"/>
+      <circle cx="38.5" cy="19" r="5.5"/>
+      <path d="M44 19 V28.5 Q44 34.5 38 34.5"/>
+    </symbol>
+  </svg>
+
+  <!-- ==================== SIDEBAR ====================
+       Replaced the top nav the pages used to carry, one copy each.
+       Every link targets the frame, so a click navigates the page in
+       it and the sidebar itself never reloads. shell.js marks the
+       current tab from the frame's URL on every load. Settings sits
+       at the bottom, apart from the pages. -->
+  <aside class="side-nav" aria-label="Primary">
+    <a class="side-brand" href="index.html" target="frame" aria-label="999, overview">
+      <span class="side-brand-mark" aria-hidden="true"><svg class="mark"><use href="#mark999"/></svg></span>
+      <span class="side-brand-text">A Juice WRLD fan project</span>
+    </a>
+
+    <ul class="side-tabs" id="sideTabs">
+      <li><a class="side-tab" href="index.html" target="frame" data-page="index.html">
+        <span class="side-tab-name">Overview</span></a></li>
+      <li><a class="side-tab" href="vault.html" target="frame" data-page="vault.html">
+        <span class="side-tab-name">The Vault</span></a></li>
+      <li><a class="side-tab" href="playlists.html" target="frame" data-page="playlists.html">
+        <span class="side-tab-name">Playlists</span></a></li>
+    </ul>
+
+    <ul class="side-tabs side-tabs-foot">
+      <li><a class="side-tab" href="settings.html" target="frame" data-page="settings.html">
+        <span class="side-tab-name">Settings</span></a></li>
+    </ul>
+  </aside>
+
+  <!-- ==================== ADD TO PLAYLIST ====================
+       The same dialog vault.html carries, here for the bar's add
+       button: picker.js works on any document that holds this markup,
+       and the bar is in this one. showModal() puts it in the top layer,
+       over the frame as well. -->
+  <dialog class="picker" id="picker" aria-labelledby="pickerTitle">
+    <div class="picker-in">
+      <div class="picker-head">
+        <span class="picker-shot" id="pickerShot" aria-hidden="true"></span>
+        <div class="picker-id">
+          <p class="lb-cat" id="pickerCatRow"><span class="dot" aria-hidden="true"></span><span id="pickerCat"></span></p>
+          <h2 class="picker-title" id="pickerTitle"></h2>
+        </div>
+        <button class="picker-close" id="pickerClose" type="button">
+          <span class="sr-only">Close</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18"/>
+          </svg>
+        </button>
+      </div>
+
+      <ul class="picker-list" id="pickerList" hidden></ul>
+
+      <p class="picker-empty" id="pickerEmpty" hidden>
+        No playlists yet. Name one below and this track goes straight into it.
+      </p>
+
+      <form class="picker-new" id="pickerNew">
+        <label class="sr-only" for="pickerName">New playlist name</label>
+        <input class="pl-input" id="pickerName" type="text" maxlength="80"
+               autocomplete="off" placeholder="New playlist name">
+        <button class="btn btn-primary" type="submit">Create and add</button>
+      </form>
+
+      <p class="picker-note" id="pickerNote" role="status" aria-live="polite"></p>
+    </div>
+  </dialog>
+
   <script type="module" src="js/shell.js"></script>
 </body>
 </html>

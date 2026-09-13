@@ -85,6 +85,16 @@ export function loadArchive() {
   return pending;
 }
 
+/**
+ * Ask again. The reply carries `audio` and `audio_index`, which are
+ * false on a machine that has never saved a track; after the first
+ * save through the bar they are true and resolveAudio() must know.
+ */
+export function refreshArchive() {
+  pending = null;
+  return loadArchive();
+}
+
 /** Join path parts with whatever separator the root came back using. */
 function join(...parts) {
   const sep = root && root.path.includes('\\') ? '\\' : '/';

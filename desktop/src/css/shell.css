@@ -1,24 +1,91 @@
 /* ============================================================
    The shell.
 
-   shell.html only. The frame fills the window and the player bar sits
-   under it. player.css already puts padding-bottom on body.has-player
-   to keep a fixed bar off the content, and the reset makes body
-   border-box, so the frame shrinks by exactly the bar's height when
-   the bar is up and takes the whole window when it is not. Nothing
-   here has to know how tall the bar is.
+   shell.html only. The sidebar sits on the left and runs the full
+   height; the frame fills the rest, and the player bar runs under the
+   frame only, starting at the sidebar's edge. The frame keeps a
+   margin the height of the bar while the bar is up (see below) and
+   takes the whole height when it is not.
    ============================================================ */
 
 html, body.shell { height: 100%; }
 
+/* The bar belongs to the page, not the window: it starts where the
+   sidebar ends, so Settings at the bottom of the sidebar stays in
+   view. The frame makes room for it by its own margin rather than
+   the body padding player.css sets, or the sidebar would be cut
+   short too. This is the one place the shell has to know --mini-h. */
+body.shell.has-player { padding-bottom: 0; }
+body.shell.has-player .shell-frame { margin-bottom: calc(var(--mini-h) + 0.5rem); }
+body.shell .mini { left: var(--side-w); }
+
 body.shell {
   margin: 0; overflow: hidden;
-  display: flex; flex-direction: column;
+  display: flex; flex-direction: row;
   background: var(--bg);
+  --side-w: 224px;
 }
 
 .shell-frame {
-  flex: 1 1 auto; min-height: 0;
-  width: 100%; border: 0; display: block;
+  flex: 1 1 auto; min-width: 0; min-height: 0;
+  height: 100%; border: 0; display: block;
   background: var(--bg);
+}
+
+/* ---------- Sidebar ----------
+   Replaces the top nav. Brand at the top, the pages under it, Settings
+   pushed to the bottom by the margin on .side-tabs-foot. */
+.side-nav {
+  flex: 0 0 var(--side-w); width: var(--side-w);
+  display: flex; flex-direction: column;
+  padding: 1.1rem 0.75rem 1rem;
+  background: var(--bg-2);
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+}
+
+.side-brand {
+  display: flex; flex-direction: column; gap: 0.35rem;
+  padding: 0.35rem 0.75rem 1.4rem;
+  text-decoration: none; color: inherit;
+}
+.side-brand-mark {
+  display: block; font-size: 1.35rem;
+  stroke: url(#mark-grad);
+}
+.side-brand-text {
+  font-size: var(--step--2); color: var(--faint);
+  letter-spacing: 0.02em;
+  transition: color var(--dur) var(--ease);
+}
+.side-brand:hover .side-brand-text { color: var(--dim); }
+
+.side-tabs { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.2rem; }
+.side-tabs-foot { margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--line); }
+
+.side-tab {
+  position: relative;
+  display: flex; align-items: center;
+  padding: 0.62rem 0.9rem;
+  border-radius: var(--r);
+  color: var(--dim); text-decoration: none;
+  font-size: var(--step-0); font-weight: 500;
+  transition: color var(--dur) var(--ease), background-color var(--dur) var(--ease);
+}
+.side-tab:hover { color: var(--text); background: rgba(255, 255, 255, 0.04); }
+.side-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.side-tab-name { min-width: 0; }
+
+/* The page in the frame right now. shell.js sets aria-current on load. */
+.side-tab[aria-current="page"] {
+  color: var(--text); background: rgba(139, 92, 246, 0.14);
+}
+.side-tab[aria-current="page"]::before {
+  content: ""; position: absolute; left: 0; top: 22%; bottom: 22%;
+  width: 3px; border-radius: 3px; background: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .side-tab, .side-brand-text { transition: none; }
 }
