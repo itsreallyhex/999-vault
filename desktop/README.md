@@ -58,8 +58,8 @@ into `%APPDATA%\xyz.juicevault.nine\config.toml`, written as a commented
 template on first run, with forward slashes and single quotes:
 
 ```toml
-data_root = 'D:/Random coding/juiceapi/web/data'
-pages_dir = 'D:/Random coding/juiceapi/desktop/src'
+data_root = 'D:/Random coding/999-vault/web/data'
+pages_dir = 'D:/Random coding/999-vault/desktop/src'
 ```
 
 The app prints what it resolved, and which rule answered, on startup. The
