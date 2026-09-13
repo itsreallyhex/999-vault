@@ -16,6 +16,7 @@ mod paths;
 mod presence;
 mod settings;
 mod tools;
+mod update;
 mod watch;
 
 /// Build the app and run it. main.rs is a one-line wrapper around this.
@@ -23,6 +24,7 @@ mod watch;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(presence::Presence::default())
         // The pages are read from a folder, not from the binary. See
         // pages.rs for why, and for the rules that find the folder.
@@ -93,6 +95,8 @@ pub fn run() {
             data::read_audio_index,
             download::download_track,
             files::save_text,
+            update::update_check,
+            update::update_install,
             tools::tools_status,
             tools::run_tool,
             presence::presence_set,

@@ -138,6 +138,8 @@
 #restartNote { color: var(--accent-2); }
 
 .set-btns { display: flex; flex-direction: column; gap: 0.5rem; align-items: stretch; }
+/* A single button under a row, sized to itself: Check now under Updates */
+.set-check { margin-top: 0.9rem; display: flex; }
 
 /* ---------- The two-way choice ----------
    Two cards side by side. The radio stays a real radio for the

@@ -124,7 +124,28 @@
       </div>
     </section>
 
-    <section class="set-group" aria-labelledby="hArchive" style="--i: 2">
+    <section class="set-group" aria-labelledby="hUpdates" style="--i: 2">
+      <div class="set-row">
+        <div class="set-group-head">
+          <span class="set-icon" aria-hidden="true"><svg><use href="#i-cloud"/></svg></span>
+          <div>
+            <h2 class="set-name" id="hUpdates">Updates</h2>
+            <p class="set-desc">When the app opens, ask the release page whether a newer version is out. It only ever asks; you choose whether to update.</p>
+            <p class="set-path mono" id="versionLine">Version</p>
+          </div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="updates" checked>
+          <span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span>
+          <span class="switch-word" id="updatesWord" data-on="On" data-off="Off">On</span>
+        </label>
+      </div>
+      <div class="set-check">
+        <button class="btn btn-ghost" id="checkUpdates" type="button">Check now</button>
+      </div>
+    </section>
+
+    <section class="set-group" aria-labelledby="hArchive" style="--i: 3">
       <div class="set-row">
         <div class="set-group-head">
           <span class="set-icon" aria-hidden="true"><svg><use href="#i-folder"/></svg></span>

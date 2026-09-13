@@ -5,9 +5,10 @@
   "description": "999, as a desktop app. Vault and playlists only.",
   "scripts": {
     "dev": "tauri dev",
-    "build": "tauri build",
-    "fresh": "taskkill /F /IM vault999.exe >nul 2>&1 & tauri build && start \"\" \"src-tauri/target/release/vault999.exe\"",
-    "tauri": "tauri"
+    "build": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1",
+    "fresh": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1 -Fresh",
+    "tauri": "tauri",
+    "release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2"

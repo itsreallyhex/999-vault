@@ -7,13 +7,15 @@
 //! toml_edit so the comments in the file survive; the plain `toml`
 //! crate would flatten them on the way back out.
 //!
-//! Two keys so far:
+//! Three keys so far:
 //!
 //!   source   "local" plays the file on disk and streams only when
 //!            there is none (the default). "stream" plays from the
 //!            archive and falls back to the file if the archive fails.
 //!   discord  false turns Rich Presence off. presence_set refuses
 //!            while it is off, so nothing reaches the pipe.
+//!   updates  false stops the shell asking the release page for a
+//!            newer version on launch. Check now still works.
 //!
 //! data_root can be set from here too, through the folder picker,
 //! which is the same key data.rs reads. A missing key means the
@@ -27,6 +29,8 @@ use crate::data;
 
 const SOURCE_KEY: &str = "source";
 const DISCORD_KEY: &str = "discord";
+/// Whether the shell asks the release for a newer version on launch.
+const UPDATES_KEY: &str = "updates";
 const ROOT_KEY: &str = "data_root";
 
 /// What the Settings page draws.
@@ -35,6 +39,10 @@ pub struct Settings {
     /// "local" or "stream".
     pub source: String,
     pub discord: bool,
+    /// Check for a newer release on launch. Missing key means yes.
+    pub updates: bool,
+    /// The version this binary is, for the Settings page to show.
+    pub version: String,
     /// The archive as resolved right now, with which rule found it.
     pub data_root: data::DataRoot,
     /// What data_root in the file says, empty if unset. Shown so the
@@ -71,11 +79,21 @@ pub fn discord_on(app: &AppHandle) -> bool {
         .unwrap_or(true)
 }
 
+/// Whether the launch-time update check runs. Missing key means yes.
+pub fn updates_on(app: &AppHandle) -> bool {
+    let (_, doc) = document(app);
+    doc.get(UPDATES_KEY)
+        .and_then(|item| item.as_bool())
+        .unwrap_or(true)
+}
+
 fn current(app: &AppHandle) -> Settings {
     let root = data::data_root(app.clone());
     Settings {
         source: source(app),
         discord: discord_on(app),
+        updates: updates_on(app),
+        version: app.package_info().version.to_string(),
         config_file: root.config_file.clone(),
         data_root_setting: data::config_str(app, ROOT_KEY).unwrap_or_default(),
         data_root: root,
@@ -90,7 +108,7 @@ pub fn settings_get(app: AppHandle) -> Settings {
 
 /// Change one setting and hand back the lot.
 ///
-/// The key is checked against the three this page owns; anything else
+/// The key is checked against the four this page owns; anything else
 /// is refused rather than written, so a typo in the frontend cannot
 /// plant a stray key in the file. `value` is a JSON string or bool.
 #[tauri::command]
@@ -109,6 +127,10 @@ pub fn settings_set(app: AppHandle, key: String, value: serde_json::Value) -> Re
         DISCORD_KEY => {
             let on = value.as_bool().ok_or("discord must be true or false")?;
             doc[DISCORD_KEY] = toml_edit::value(on);
+        }
+        UPDATES_KEY => {
+            let on = value.as_bool().ok_or("updates must be true or false")?;
+            doc[UPDATES_KEY] = toml_edit::value(on);
         }
         ROOT_KEY => {
             // Empty clears the setting and the lookup rules take over.

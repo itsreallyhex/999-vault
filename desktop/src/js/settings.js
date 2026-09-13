@@ -26,7 +26,8 @@ import { invoke, inTauri } from './tauri.js';
 import { initPlayer, applySettings } from './player.js';
 
 const el = {};
-['discord', 'discordWord', 'rootPath', 'rootFound', 'rootBy', 'pickRoot', 'clearRoot',
+['discord', 'discordWord', 'updates', 'updatesWord', 'versionLine', 'checkUpdates',
+  'rootPath', 'rootFound', 'rootBy', 'pickRoot', 'clearRoot',
   'restartNote', 'cfgPath', 'status', 'summary']
   .forEach((id) => { el[id] = document.getElementById(id); });
 const sources = [...document.querySelectorAll('input[name="source"]')];
@@ -37,6 +38,8 @@ const held = (k) => el.rootFound.querySelector(`[data-k="${k}"]`);
 const DEFAULTS = {
   source: 'local',
   discord: true,
+  updates: true,
+  version: '',
   data_root: { path: '', source: 'not found', exists: false, catalogue: false, covers: false, audio: false, audio_index: false },
   data_root_setting: '',
   config_file: ''
@@ -79,6 +82,11 @@ function draw(s) {
   el.discordWord.textContent = s.discord ? el.discordWord.dataset.on : el.discordWord.dataset.off;
   setChip('discord', s.discord ? 'Discord on' : 'Discord off', s.discord ? 'on' : '');
 
+  const updates = s.updates !== false;
+  el.updates.checked = updates;
+  el.updatesWord.textContent = updates ? el.updatesWord.dataset.on : el.updatesWord.dataset.off;
+  el.versionLine.textContent = s.version ? `Version ${s.version}` : 'Version unknown';
+
   const root = s.data_root;
   ['catalogue', 'covers', 'audio'].forEach((k) => { held(k).dataset.on = String(Boolean(root[k])); });
   if (root.exists) {
@@ -120,6 +128,24 @@ function wire() {
   });
 
   el.discord.addEventListener('change', () => set('discord', el.discord.checked));
+  el.updates.addEventListener('change', () => set('updates', el.updates.checked));
+
+  // The check lives in the shell, which owns the pop-up. A newer
+  // version opens it there; anything else is a line here.
+  el.checkUpdates.addEventListener('click', async () => {
+    let host = null;
+    try { host = window.parent !== window ? window.parent.__nine_updates : null; } catch { host = null; }
+    if (!host) { say('Updates are checked by the app window, not this page', true); return; }
+    el.checkUpdates.disabled = true;
+    say('Checking');
+    try {
+      const r = await host.check(true);
+      if (!r.ok) say(r.error || 'The check failed', true);
+      else if (!r.available) say(`You have the latest version, ${r.current}`);
+    } finally {
+      el.checkUpdates.disabled = false;
+    }
+  });
 
   el.pickRoot.addEventListener('click', async () => {
     let picked = null;

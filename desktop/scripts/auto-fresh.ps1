@@ -81,24 +81,11 @@ if (-not $Build) {
 $PID | Out-File $lock -Encoding ascii
 Log "build start"
 
-$vcvars = Get-ChildItem "C:\Program Files*\Microsoft Visual Studio\*\*\VC\Auxiliary\Build\vcvars64.bat" -ErrorAction SilentlyContinue |
-  Select-Object -First 1 -ExpandProperty FullName
-$prefix = if ($vcvars) { "`"$vcvars`" >nul && " } else { "" }
-
-# Name the linker outright rather than trusting PATH order. Claude Code's
-# own environment puts Git's usr\bin first, and three builds in a row
-# (2026-09-13, the first with a crate that had to be linked fresh) picked
-# up Git's coreutils link.exe through npx despite vcvars, failing with
-# "link: extra operand". rustc honours this variable over PATH. vcvars
-# is still run for LIB and INCLUDE.
-$link = Get-ChildItem "C:\Program Files*\Microsoft Visual Studio\*\*\VC\Tools\MSVC\*\bin\Hostx64\x64\link.exe" -ErrorAction SilentlyContinue |
-  Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
-if ($link) {
-  $env:CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER = $link
-  Log "linker $link"
-} else {
-  Log "no MSVC link.exe found; trusting PATH"
-}
+# vcvars, the MSVC linker named outright, and the updater signing key:
+# see env.ps1 for why each is there.
+. (Join-Path $PSScriptRoot 'env.ps1')
+if ($env:CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER) { Log "linker $env:CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER" } else { Log "no MSVC link.exe found; trusting PATH" }
+if (-not $signed) { Log "no signing key in ~/.tauri; the build will stop at the updater artifacts" }
 
 # 1. Close the running app: a locked exe fails the build.
 Get-Process vault999 -ErrorAction SilentlyContinue | Stop-Process -Force
@@ -118,12 +105,15 @@ if ($after -gt $before) {
   Log "build failed: exe not updated (was $before). See the output above."
 }
 
-# Keep only the newest installer of each kind
+# Keep only the newest installer of each kind. Per extension, because
+# the signed build leaves a .sig beside each installer and both stay.
 foreach ($kind in 'nsis', 'msi') {
   $dir = Join-Path $target "release\bundle\$kind"
   if (-not (Test-Path $dir)) { continue }
-  $old = Get-ChildItem $dir -File | Sort-Object LastWriteTime -Descending | Select-Object -Skip 1
-  foreach ($f in $old) { Remove-Item $f.FullName -Force; Log "deleted old installer $($f.Name)" }
+  foreach ($group in (Get-ChildItem $dir -File | Group-Object Extension)) {
+    $old = $group.Group | Sort-Object LastWriteTime -Descending | Select-Object -Skip 1
+    foreach ($f in $old) { Remove-Item $f.FullName -Force; Log "deleted old installer $($f.Name)" }
+  }
 }
 
 Remove-Item $lock -Force

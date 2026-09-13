@@ -102,6 +102,28 @@
     </div>
   </dialog>
 
+  <!-- ==================== NEW RELEASE ====================
+       Shown when the release page carries a newer version than this
+       build. Update downloads the installer, runs it quietly and reopens
+       the app; Remind me later keeps that version quiet for a day. A
+       native <dialog>, so Escape is Remind me later for free. -->
+  <dialog class="update" id="update" aria-labelledby="updateTitle">
+    <div class="update-in">
+      <p class="label">New release</p>
+      <h2 class="update-title" id="updateTitle">Version <span id="updateVersion"></span> is out</h2>
+      <p class="update-sub">You have <span class="mono" id="updateCurrent"></span>. Updating downloads the installer, runs it, and reopens the app where you left off.</p>
+      <div class="update-notes" id="updateNotes" hidden></div>
+      <div class="update-progress" id="updateProgress" hidden>
+        <div class="update-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="updateBar"><i id="updateFill"></i></div>
+        <p class="update-status mono" id="updateStatus" role="status" aria-live="polite"></p>
+      </div>
+      <div class="update-btns">
+        <button class="btn btn-primary" id="updateGo" type="button">Update</button>
+        <button class="btn btn-ghost" id="updateLater" type="button">Remind me later</button>
+      </div>
+    </div>
+  </dialog>
+
   <script type="module" src="js/shell.js"></script>
 </body>
 </html>

@@ -32,6 +32,18 @@
     "resources": {
       "../src": "pages",
       "../../web/data/catalogue.json": "seed/catalogue.json"
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRDRjJCMTQzQjNGNENCQTcKUldTbnkvU3pRN0h5VEdKdjE4RTV3S2EwNkxNUC9vY3BEZUE5cEpmQ0x5S3lpK2NZaU53eU9YZ2cK",
+      "endpoints": [
+        "https://github.com/itsreallyhex/999-vault/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }

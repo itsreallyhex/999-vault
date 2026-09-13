@@ -89,3 +89,30 @@ body.shell {
 @media (prefers-reduced-motion: reduce) {
   .side-tab, .side-brand-text { transition: none; }
 }
+
+/* ---------- New release ----------
+   The pop-up for an update. Same bones as the picker: a native dialog,
+   a panel in the middle, the page dimmed behind it. */
+.update {
+  border: 1px solid var(--line); border-radius: var(--r-lg);
+  padding: 0; background: var(--bg-2); color: var(--text);
+  width: min(460px, calc(100vw - 2rem));
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+}
+.update::backdrop { background: rgba(8, 7, 12, 0.7); backdrop-filter: blur(6px); }
+.update-in { padding: 1.5rem 1.6rem 1.4rem; display: grid; gap: 0.8rem; }
+.update-title { margin: 0; font-family: 'Righteous', 'Poppins', system-ui, sans-serif; font-size: var(--step-2); font-weight: 400; }
+.update-sub { margin: 0; color: var(--dim); font-size: var(--step--1); line-height: 1.5; }
+.update-notes {
+  max-height: 180px; overflow-y: auto;
+  padding: 0.7rem 0.9rem; border: 1px solid var(--line); border-radius: var(--r);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--dim); font-size: var(--step--1); line-height: 1.55;
+  white-space: pre-line;
+}
+.update-progress { display: grid; gap: 0.4rem; }
+.update-bar { height: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.update-bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 200ms linear; }
+.update-status { margin: 0; font-size: var(--step--2); color: var(--dim); }
+.update-btns { display: flex; gap: 0.6rem; justify-content: flex-end; margin-top: 0.3rem; }
+.update.is-busy .update-btns { opacity: 0.5; pointer-events: none; }

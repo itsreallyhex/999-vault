@@ -98,9 +98,18 @@ shows for a track that is not on this machine yet.
 edit in a file: whether songs come from the files on this machine first or
 from the archive first (local first is the default; stream first plays from
 the archive and falls back to the file if the archive fails), whether
-Discord is told what is playing, and which folder the archive is in, with a
-folder picker. Changes save as you make them. A folder change is picked up
-the next time the app opens.
+Discord is told what is playing, whether the app checks for a newer
+release when it opens, and which folder the archive is in, with a folder
+picker. Changes save as you make them. A folder change is picked up the
+next time the app opens.
+
+**Updates.** A few seconds after opening, the app asks the GitHub release
+page whether a newer version is out. If there is one, a pop-up says so,
+with the notes, and offers Update or Remind me later. Update downloads the
+installer, checks its signature, runs it quietly and reopens the app where
+you left off; Remind me later keeps that version quiet for a day. Nothing
+installs without the button being pressed. The switch in Settings turns
+the check off; Check now asks on the spot.
 
 **Discord** shows what is playing while the app is open and Discord is
 running. Three states:
@@ -121,6 +130,26 @@ Stopping, or a track ending, clears it. The cover comes from the archive's
 CDN because Discord fetches it from its own servers. Turn it off in
 Settings.
 
+## Releasing
+
+```powershell
+cd desktop
+npm run release -- -Version 0.2.0 -Notes "What changed, in a line or two"
+```
+
+That bumps the version in the three files that carry it, builds the
+installer signed with the key in `~/.tauri/`, writes `latest.json`,
+commits the bump as `Release 0.2.0`, pushes the branch, and creates
+GitHub release `v0.2.0` with the installer, its `.sig` and `latest.json`
+attached. Installed copies see it the next time they open. The tree has
+to be clean first: the release commit is the bump alone.
+
+The key is `~/.tauri/999-vault.key` with its password in
+`~/.tauri/999-vault.pass`, made once with `npx tauri signer generate -p`.
+Neither enters the repo. The public half is in `tauri.conf.json`. Lose
+the private half and installed copies cannot update, only reinstall.
+`npm run build` and `npm run fresh` sign too, so they need the same files.
+
 ## Files
 
 ```text
@@ -139,6 +168,14 @@ src-tauri/src/
   pages.rs        Serves src/ off disk.
   presence.rs     Discord.
   settings.rs     Reads and writes the settings in config.toml.
+  download.rs     Saves one track through the archive's download endpoint.
+  files.rs        The native Save As behind Export.
+  update.rs       Checks the release page and installs an update.
+scripts/
+  env.ps1         The build environment: MSVC linker, signing key.
+  build.ps1       npm run build / npm run fresh.
+  auto-fresh.ps1  Rebuilds and reopens the app when the Rust side changes.
+  release.ps1     Cuts a release. See above.
   tools.rs        Runs the Python scripts in web/tools.
 ```
 

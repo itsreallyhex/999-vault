@@ -37,3 +37,7 @@ discord-rich-presence = "1"
 # /music/download into the archive folder. Small, blocking, rustls;
 # it runs on a worker thread. See download.rs.
 ureq = "2"
+# In-app updates from a GitHub release: fetches latest.json, verifies the
+# installer against the public key in tauri.conf.json, installs quietly.
+# Driven from update.rs; the frontend never touches it.
+tauri-plugin-updater = "2"

@@ -79,9 +79,13 @@ discord_client_id = ""
 # archive and fall back to the file if the archive fails.
 #
 # discord is false to keep the "Listening to" status off Discord.
+#
+# updates is false to stop the app asking the release page for a newer
+# version when it opens. Settings has a Check now button either way.
 
 source = "local"
 discord = true
+updates = true
 "#;
 
 /// What the frontend is told about the archive.

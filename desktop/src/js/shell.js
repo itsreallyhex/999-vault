@@ -11,6 +11,8 @@
         under the frame.
      3. Makes the frame and points it at the overview.
      4. Keeps the sidebar's current tab in step with the frame.
+     5. Asks the release page for a newer version, once, a few seconds
+        after launch, and shows the pop-up if there is one.
 
    The order is the point. The global goes up before the frame exists,
    so there is no window in which a page could load, look for a host,
@@ -23,6 +25,7 @@
    ============================================================ */
 
 import * as player from './player.js';
+import { invoke, inTauri } from './tauri.js';
 
 window.__nine_player = player;
 
@@ -122,6 +125,158 @@ frame.addEventListener('load', () => {
 // right.
 document.querySelector('.side-nav').after(frame);
 
+/* ---------- New release ----------
+   update.rs does the checking, downloading and installing through
+   Tauri's updater plugin; this is the pop-up and the two decisions
+   around it. On launch the check runs once, after a short wait so it
+   never competes with the first page, and only if the `updates`
+   setting is on. Remind me later keeps that one version quiet for a
+   day; a newer one after that shows again. Settings reaches the same
+   check through window.__nine_updates, which is how Check now works.
+
+   Under a plain browser there is no Rust and nothing here runs. */
+
+const SNOOZE_KEY = '999:update-snooze';
+const SNOOZE_FOR = 24 * 60 * 60 * 1000;
+const CHECK_AFTER = 4000;
+
+const up = {};
+['update', 'updateVersion', 'updateCurrent', 'updateNotes', 'updateProgress',
+  'updateBar', 'updateFill', 'updateStatus', 'updateGo', 'updateLater']
+  .forEach((id) => { up[id] = document.getElementById(id); });
+
+let offer = null;
+let installing = false;
+
+function snoozed(version) {
+  try {
+    const s = JSON.parse(localStorage.getItem(SNOOZE_KEY) || 'null');
+    return Boolean(s && s.version === version && Date.now() < s.until);
+  } catch {
+    return false;
+  }
+}
+
+function snooze(version) {
+  try { localStorage.setItem(SNOOZE_KEY, JSON.stringify({ version, until: Date.now() + SNOOZE_FOR })); } catch { /* fine */ }
+}
+
+function openDialog() {
+  if (typeof up.update.showModal === 'function') {
+    if (!up.update.open) up.update.showModal();
+  } else {
+    up.update.open = true;
+  }
+}
+
+function closeDialog() {
+  if (typeof up.update.close === 'function' && up.update.open) up.update.close();
+  else up.update.open = false;
+}
+
+function showOffer(info) {
+  offer = info;
+  up.updateVersion.textContent = info.version;
+  up.updateCurrent.textContent = info.current;
+  const notes = (info.notes || '').trim();
+  up.updateNotes.textContent = notes;
+  up.updateNotes.hidden = !notes;
+  up.updateProgress.hidden = true;
+  up.updateFill.style.width = '0';
+  up.updateStatus.textContent = '';
+  up.update.classList.remove('is-busy');
+  openDialog();
+  up.updateGo.focus();
+}
+
+const mb = (n) => `${(n / 1048576).toFixed(1)} MB`;
+
+function onProgress(payload) {
+  if (!payload) return;
+  if (payload.done) {
+    up.updateFill.style.width = '100%';
+    up.updateBar.setAttribute('aria-valuenow', '100');
+    up.updateStatus.textContent = 'Installing, the app will reopen on its own';
+    return;
+  }
+  const { got, total } = payload;
+  if (total) {
+    const pct = Math.min(100, Math.round((got / total) * 100));
+    up.updateFill.style.width = `${pct}%`;
+    up.updateBar.setAttribute('aria-valuenow', String(pct));
+    up.updateStatus.textContent = `${mb(got)} of ${mb(total)}`;
+  } else {
+    up.updateStatus.textContent = mb(got);
+  }
+}
+
+async function install() {
+  if (!offer || installing) return;
+  installing = true;
+  up.update.classList.add('is-busy');
+  up.updateProgress.hidden = false;
+  up.updateStatus.textContent = 'Downloading';
+  try {
+    await invoke('update_install');
+    // On Windows the installer takes over and this process exits
+    // before the promise settles; the line above is what stays on
+    // screen until then.
+  } catch (err) {
+    up.updateStatus.textContent = String(err);
+    up.update.classList.remove('is-busy');
+    installing = false;
+  }
+}
+
+function later() {
+  if (installing) return;
+  if (offer) snooze(offer.version);
+  closeDialog();
+}
+
+/**
+ * Ask Rust. Resolves to what happened rather than throwing, so a
+ * caller can turn it into a toast: { ok, error } on a failure,
+ * { ok, available: false, current } when this is the latest,
+ * { ok, available: true, version, snoozed } when there is a newer one.
+ * The pop-up opens for a newer version unless it is snoozed and the
+ * check was not asked for by hand.
+ */
+async function checkUpdates({ manual = false } = {}) {
+  if (!inTauri) return { ok: false, error: 'Not running as the app' };
+  let info;
+  try {
+    info = await invoke('update_check');
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+  if (!info.available) return { ok: true, available: false, current: info.current };
+  if (!manual && snoozed(info.version)) return { ok: true, available: true, snoozed: true, version: info.version };
+  showOffer(info);
+  return { ok: true, available: true, snoozed: false, version: info.version };
+}
+
+window.__nine_updates = { check: (manual = false) => checkUpdates({ manual }) };
+
+if (up.update) {
+  up.updateGo.addEventListener('click', install);
+  up.updateLater.addEventListener('click', later);
+  // Escape, or a click outside the panel, is Remind me later. Neither
+  // is allowed once the download has started.
+  up.update.addEventListener('cancel', (event) => { event.preventDefault(); later(); });
+  up.update.addEventListener('click', (event) => {
+    if (!event.target.closest('.update-in')) later();
+  });
+}
+
+if (inTauri) {
+  setTimeout(() => {
+    invoke('settings_get')
+      .then((s) => { if (!s || s.updates !== false) return checkUpdates(); return null; })
+      .catch(() => { /* an old binary, or offline: nothing to say on launch */ });
+  }, CHECK_AFTER);
+}
+
 /* ---------- Live reload ----------
    watch.rs emits `pages-changed` with the files that moved, relative
    to the pages folder, when the pages come from a checkout. What to do
@@ -181,6 +336,7 @@ try {
       const files = Array.isArray(event.payload) ? event.payload : [];
       if (files.length) onPagesChanged(files);
     });
+    events.listen('update-progress', (event) => onProgress(event.payload));
   }
 } catch {
   // No bridge: a plain browser, or a build without the watcher. Ctrl+R
