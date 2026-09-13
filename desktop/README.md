@@ -19,21 +19,21 @@ That makes `src-tauri/target/release/vault999.exe` and two installers under
 Run any of them. `npm run dev` is only for working on the Rust side.
 
 After a change to the Rust side, `npm run fresh` closes the running app,
-builds, and opens the new one, so the window on screen is never an older
-build than the code.
+builds, and opens the new one. With Claude Code you do not even type that:
+a Stop hook in `.claude/settings.json` runs it at the end of any turn that
+touched `src-tauri/`, in the background, and prunes old installers when it
+is done. The log is `src-tauri/target/auto-fresh.log`.
 
 Needs Rust plus, on Windows, two Visual Studio components: *MSVC v143 - VS
 2022 C++ x64/x86 build tools* and a *Windows 11 SDK*. Run cargo from
 PowerShell, not Git Bash: Git's own `link.exe` shadows the MSVC linker.
 
-**Editing the pages needs no rebuild.** They are read off disk at runtime.
-Point `pages_dir` in the config file at `desktop/src`, then:
-
-- **Ctrl+R** or **F5** reloads the page. The music keeps playing.
-- **Ctrl+Shift+R** reloads the whole window, player included. Needed after
-  editing `player.js` or `shell.js`.
-
-Only changes under `src-tauri/` need a rebuild.
+**Editing the pages needs no rebuild, and no reload either.** They are
+read off disk at runtime, and when they come from a checkout the app
+watches the folder: save a stylesheet and it is swapped in place with the
+music still playing, save a page and the frame reloads, save `player.js` or
+`shell.js` and the whole window reloads. **Ctrl+R** / **F5** and
+**Ctrl+Shift+R** still do the same by hand.
 
 ## Point it at the archive
 
