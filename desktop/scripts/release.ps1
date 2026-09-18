@@ -75,7 +75,9 @@ function Set-Version($path, $pattern, $replacement) {
   $text = Get-Content $path -Raw
   $new = [regex]::Replace($text, $pattern, $replacement, 1)
   if ($new -eq $text -and $text -notmatch [regex]::Escape("`"$Version`"")) { throw "No version line found in $path" }
-  Write-Text $path $new
+  # Untouched when nothing changed: a rewrite moves the mtime, and the
+  # Stop hook reads a newer Cargo.toml as a reason to rebuild.
+  if ($new -ne $text) { Write-Text $path $new }
 }
 Set-Version $conf  '(?m)^(\s*"version":\s*")[^"]*(")' "`${1}$Version`${2}"
 Set-Version $cargo '(?m)^version = "[^"]+"'            "version = `"$Version`""
