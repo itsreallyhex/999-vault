@@ -78,7 +78,10 @@ playing track is marked on its row and card, and a track you never pulled to
 disk streams from the archive instead of refusing; the bar says `via API`
 while it does. Next prefers files on disk and streams only when the current
 filter has none. One click on a Vault card opens the detail panel, two play
-it.
+it. A playlist has a search box over its rows, matching titles and alternate
+names, and every row has a queue button: the track plays after the current
+one, then the playlist carries on where it was. The bar shows how many are
+waiting.
 
 **The sidebar** on the left is how you move between the pages, with
 Settings at the bottom. It lives outside the pages
