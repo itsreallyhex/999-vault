@@ -51,6 +51,10 @@ let toastTimer = null;
 /* ---------- Toast ---------- */
 
 function say(text, bad = false) {
+  // Under the shell the toast is drawn over the bar, where a page's
+  // own would be clipped by the frame. A bare page keeps its own.
+  const up = window.parent !== window && window.parent.__nine_toast;
+  if (up) { up(text, bad); return; }
   clearTimeout(toastTimer);
   el.status.textContent = text;
   el.status.dataset.state = bad ? 'bad' : '';

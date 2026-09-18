@@ -31,6 +31,64 @@ window.__nine_player = player;
 
 player.initPlayer();
 
+/* ---------- The bar's real height ----------
+   --mini-h is the bar's minimum, and with a subtitle, a note and the
+   via API pill the bar is taller than that. The frame's margin has to
+   match what is on screen or the bottom of every page sits under the
+   bar, so the bar is measured and --bar-h follows it. A separate
+   variable, because writing --mini-h back would raise the bar's own
+   min-height and it could never shrink again. */
+{
+  const bar = document.querySelector('.mini');
+  const measure = () => {
+    document.documentElement.style.setProperty('--bar-h', `${bar.hidden ? 0 : bar.offsetHeight}px`);
+  };
+  if (bar) {
+    // jsdom has no ResizeObserver; the CSS falls back to --mini-h there
+    if (typeof ResizeObserver === 'function') new ResizeObserver(measure).observe(bar);
+    measure();
+  }
+}
+
+/* ---------- Toast ----------
+   A page's own toast would be clipped by the frame's edge, so a framed
+   page hands the text up and the shell shows it over the bar, which is
+   always in view. window.__nine_toast(text, bad). */
+const toast = document.createElement('p');
+toast.className = 'shell-toast';
+toast.setAttribute('role', 'status');
+toast.setAttribute('aria-live', 'polite');
+document.body.appendChild(toast);
+let toastTimer = null;
+window.__nine_toast = (text, bad = false) => {
+  clearTimeout(toastTimer);
+  toast.textContent = text;
+  toast.dataset.state = bad ? 'bad' : '';
+  toast.classList.add('is-shown');
+  toastTimer = setTimeout(() => toast.classList.remove('is-shown'), bad ? 6000 : 2200);
+};
+
+/* ---------- The link out ----------
+   The GitHub link in the sidebar has to open in the system browser: a
+   plain navigation would load GitHub inside the window, and the
+   webview never opens a new window. Under Tauri that is the shell
+   plugin's open, allowed for http(s) by shell:default in the
+   capabilities; a bare browser gets a normal new tab. */
+const github = document.getElementById('sideGithub');
+if (github) {
+  github.addEventListener('click', (event) => {
+    event.preventDefault();
+    const url = github.href;
+    if (inTauri) {
+      invoke('plugin:shell|open', { path: url }).catch((err) => {
+        window.__nine_toast(`Could not open the browser: ${err.message || err}`, true);
+      });
+    } else {
+      window.open(url, '_blank', 'noopener');
+    }
+  });
+}
+
 const frame = document.createElement('iframe');
 frame.className = 'shell-frame';
 frame.id = 'frame';

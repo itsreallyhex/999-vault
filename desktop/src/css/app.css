@@ -1067,7 +1067,8 @@ img { display: block; max-width: 100%; }
 /* ---------- The tracklist ---------- */
 .pl-rows-head, .pl-row {
   display: grid; align-items: center; gap: 0.85rem;
-  grid-template-columns: 2.1rem 48px minmax(0, 1fr) 7.5rem 4rem 6.6rem;
+  /* The last column holds four 32px buttons and their gaps */
+  grid-template-columns: 2.1rem 48px minmax(0, 1fr) 7.5rem 4rem 9.4rem;
 }
 .pl-rows-head {
   padding: 0 0.75rem 0.6rem;

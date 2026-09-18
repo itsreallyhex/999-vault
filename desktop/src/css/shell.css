@@ -16,7 +16,27 @@ html, body.shell { height: 100%; }
    the body padding player.css sets, or the sidebar would be cut
    short too. This is the one place the shell has to know --mini-h. */
 body.shell.has-player { padding-bottom: 0; }
-body.shell.has-player .shell-frame { margin-bottom: calc(var(--mini-h) + 0.5rem); }
+body.shell.has-player .shell-frame { margin-bottom: calc(var(--bar-h, var(--mini-h)) + 0.5rem); }
+
+/* Over the bar, not under it: a framed page's own toast stops at the
+   frame's edge, so shell.js draws this one instead. Centred over the
+   bar's width, sitting in its upper half. */
+.shell-toast {
+  position: fixed; left: var(--side-w); right: 0;
+  bottom: calc(var(--bar-h, var(--mini-h)) - 3.2rem);
+  margin: 0 auto; width: fit-content; max-width: min(80vw, 60ch);
+  padding: 0.6rem 1rem; border-radius: 999px;
+  background: var(--bg-3); border: 1px solid var(--line-2);
+  color: var(--text); font-size: var(--step--1); text-align: center;
+  box-shadow: 0 12px 30px -12px rgba(0, 0, 0, 0.7);
+  opacity: 0; transform: translateY(10px); pointer-events: none;
+  transition: opacity 240ms var(--ease), transform 320ms var(--ease);
+  z-index: calc(var(--z-player) + 1);
+}
+.shell-toast.is-shown { opacity: 1; transform: translateY(0); }
+.shell-toast[data-state="bad"] { border-color: color-mix(in srgb, var(--c-cut) 60%, var(--line-2)); color: var(--c-cut); }
+/* No bar up: sit at the bottom edge instead */
+body.shell:not(.has-player) .shell-toast { bottom: 1.25rem; }
 body.shell .mini { left: var(--side-w); }
 
 body.shell {
@@ -80,6 +100,11 @@ body.shell {
 .side-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .side-tab-name { min-width: 0; }
+
+/* The one link that leaves the app: the GitHub mark before the name.
+   The tabs carry no icons on purpose; this is a link out, not a tab. */
+.side-tab-ico { width: 16px; height: 16px; flex: none; margin-right: 0.6rem; opacity: 0.8; }
+.side-tab-ext:hover .side-tab-ico { opacity: 1; }
 
 /* The page in the frame right now. shell.js sets aria-current on load. */
 .side-tab[aria-current="page"] {
