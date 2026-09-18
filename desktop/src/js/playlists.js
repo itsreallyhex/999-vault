@@ -22,7 +22,7 @@ import { buildCover, buildAssignments, coverSpec } from './covers.js';
 import { swatchFor } from './ui.js';
 import {
   initPlayer, playFromPlaylist, toggleShuffle, isShuffled,
-  toggle, onPlayback, sameTrack
+  toggle, onPlayback, sameTrack, enqueue
 } from './player.js';
 import { loadArchive, invoke, inTauri } from './tauri.js';
 import {
@@ -39,13 +39,20 @@ const el = {};
   'plPlay', 'plShuffle',
   'plSideN', 'plLists', 'plListsEmpty', 'plNewForm', 'plNewName',
   'plPane', 'plBlank', 'plForm', 'plName', 'plNoteField', 'plFormCancel',
-  'plDelete', 'plRowsHead', 'plRows', 'plRowsEmpty', 'plExport', 'plImport'
+  'plDelete', 'plRowsHead', 'plRows', 'plRowsEmpty', 'plRowsNone', 'plExport', 'plImport',
+  'plFindRow', 'plFind', 'plFindN', 'plFindClear'
 ].forEach((id) => { el[id] = document.getElementById(id); });
 
 /* ---------- State ---------- */
 let lists = [];
 let items = [];
 let currentId = null;
+
+/** The search box, and the rows it leaves visible. `shown` is a
+    subset of `items` in the same order; the rows on screen follow it,
+    while numbers, play and reorder still speak in playlist positions. */
+let query = '';
+let shown = [];
 
 /** Set while the delete button is armed, so one stray click cannot
     destroy a list. Cleared on a timer. */
@@ -98,6 +105,8 @@ function markSvg() {
 const UP = 'M12 19V5M5 12l7-7 7 7';
 const DOWN = 'M12 5v14M19 12l-7 7-7-7';
 const CROSS = 'M6 6l12 12M18 6L6 18';
+/* Three lines and a plus: add to the queue */
+const QUEUE = 'M4 6h11M4 12h11M4 18h7M18 13v8M14 17h8';
 
 /** Filled, unlike the others: a stroked triangle at this size reads
     as a smudge rather than a play button. */
@@ -335,10 +344,22 @@ function buildRow(item, index) {
 
   const acts = make('span', 'pl-acts');
 
+  // Play after whatever is on now, without leaving the running order.
+  const queue = make('button', 'pl-act pl-act-queue');
+  queue.type = 'button';
+  queue.appendChild(icon(QUEUE));
+  queue.appendChild(make('span', 'sr-only', `Add ${item.t} to the queue`));
+  queue.addEventListener('click', () => {
+    const n = enqueue(item);
+    say(n ? `${item.t} added to the queue (${n} waiting)` : `Playing ${item.t}`);
+  });
+
+  // Moving a row while the list is filtered would step it past rows
+  // that are not on screen, so the arrows wait for the box to clear.
   const up = make('button', 'pl-act');
   up.type = 'button';
   up.dataset.dir = 'up';
-  up.disabled = index === 0;
+  up.disabled = index === 0 || Boolean(query);
   up.appendChild(icon(UP));
   up.appendChild(make('span', 'sr-only', `Move ${item.t} up`));
   up.addEventListener('click', () => shift(item.id, -1));
@@ -346,7 +367,7 @@ function buildRow(item, index) {
   const down = make('button', 'pl-act');
   down.type = 'button';
   down.dataset.dir = 'down';
-  down.disabled = index === items.length - 1;
+  down.disabled = index === items.length - 1 || Boolean(query);
   down.appendChild(icon(DOWN));
   down.appendChild(make('span', 'sr-only', `Move ${item.t} down`));
   down.addEventListener('click', () => shift(item.id, 1));
@@ -357,12 +378,41 @@ function buildRow(item, index) {
   cut.appendChild(make('span', 'sr-only', `Remove ${item.t} from this playlist`));
   cut.addEventListener('click', () => dropItem(item));
 
+  acts.appendChild(queue);
   acts.appendChild(up);
   acts.appendChild(down);
   acts.appendChild(cut);
   li.appendChild(acts);
 
   return li;
+}
+
+/* ---------- Search inside the list ---------- */
+
+/** Lowercase, accents and punctuation dropped, so "moncler" finds
+    "Moncler Year (v3)" and a curly apostrophe does not hide a match. */
+function fold(s) {
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+function matches(item, q) {
+  if (fold(item.t).includes(q)) return true;
+  return (item.a || []).some((alt) => fold(alt).includes(q));
+}
+
+function applyQuery(value) {
+  query = fold(value);
+  el.plFindRow.classList.toggle('has-value', Boolean(el.plFind.value));
+  renderRows();
+}
+
+function clearQuery() {
+  el.plFind.value = '';
+  applyQuery('');
 }
 
 function renderRows() {
@@ -372,14 +422,25 @@ function renderRows() {
   // read for the hero wash.
   buildAssignments(items);
 
+  // The rows on screen are the matches; each keeps its position in the
+  // whole list, which is what the number, play and the arrows mean.
+  shown = query ? items.filter((item) => matches(item, query)) : items;
+
   el.plRows.textContent = '';
   const frag = document.createDocumentFragment();
-  items.forEach((item, i) => frag.appendChild(buildRow(item, i)));
+  shown.forEach((item) => frag.appendChild(buildRow(item, items.indexOf(item))));
   el.plRows.appendChild(frag);
 
-  el.plRows.hidden = items.length === 0;
-  el.plRowsHead.hidden = items.length === 0;
-  el.plRowsEmpty.hidden = items.length !== 0;
+  const empty = items.length === 0;
+  const none = !empty && shown.length === 0;
+  el.plFindRow.hidden = empty;
+  el.plRows.hidden = empty || none;
+  el.plRowsHead.hidden = empty || none;
+  el.plRowsEmpty.hidden = !empty;
+  el.plRowsNone.hidden = !none;
+
+  el.plFindN.hidden = !query;
+  el.plFindN.textContent = query ? `${shown.length} of ${items.length}` : '';
 
   // Fresh rows carry no mark, so it goes back on here
   markPlaying();
@@ -395,7 +456,7 @@ function renderRows() {
  */
 function markPlaying() {
   const rows = el.plRows.children;
-  items.forEach((item, i) => {
+  shown.forEach((item, i) => {
     const row = rows[i];
     if (!row) return;
 
@@ -453,6 +514,12 @@ function toggleForm() {
 
 /* ---------- Actions ---------- */
 async function select(id) {
+  // A search belongs to the list it was typed over
+  if (id !== currentId && query) {
+    el.plFind.value = '';
+    query = '';
+    el.plFindRow.classList.remove('has-value');
+  }
   currentId = id;
 
   try {
@@ -687,6 +754,20 @@ el.plImport.addEventListener('change', doImport);
 
 // Arming the delete and then editing the name is a change of mind
 el.plName.addEventListener('input', disarmDelete);
+
+/* Search inside the list. Enter plays the first match; Escape clears
+   the box if it has anything in it, and otherwise falls through. */
+el.plFind.addEventListener('input', () => applyQuery(el.plFind.value));
+el.plFindClear.addEventListener('click', () => { clearQuery(); el.plFind.focus(); });
+el.plFind.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && shown.length) {
+    event.preventDefault();
+    playAt(items.indexOf(shown[0]));
+  } else if (event.key === 'Escape' && el.plFind.value) {
+    event.stopPropagation();
+    clearQuery();
+  }
+});
 
 // Escape closes the edit panel rather than leaving it hanging open
 document.addEventListener('keydown', (event) => {

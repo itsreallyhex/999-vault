@@ -218,8 +218,11 @@
 .switch input:checked ~ .switch-word { color: var(--text); }
 
 /* ---------- Toast ---------- */
+/* Under the shell the bar is outside this document and the frame
+   already stops above it, so the toast sits at the frame's own edge.
+   Only a page that mounts its own bar (has-player) clears --mini-h. */
 .set-toast {
-  position: fixed; left: 50%; bottom: calc(var(--mini-h, 0px) + 1.25rem);
+  position: fixed; left: 50%; bottom: 1.25rem;
   transform: translate(-50%, 16px);
   margin: 0; padding: 0.6rem 1rem; border-radius: 999px;
   background: var(--bg-3); border: 1px solid var(--line-2);
@@ -230,6 +233,7 @@
   z-index: var(--z-player, 60);
   max-width: min(92vw, 60ch); text-align: center;
 }
+body.has-player .set-toast { bottom: calc(var(--mini-h, 0px) + 1.25rem); }
 .set-toast.is-shown { opacity: 1; transform: translate(-50%, 0); }
 .set-toast[data-state="bad"] { border-color: color-mix(in srgb, var(--c-cut) 60%, var(--line-2)); color: var(--c-cut); }
 

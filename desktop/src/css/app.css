@@ -1135,6 +1135,16 @@ img { display: block; max-width: 100%; }
 .pl-act:hover:not(:disabled) { color: var(--text); border-color: var(--line-2); }
 .pl-act:disabled { opacity: 0.28; cursor: default; }
 .pl-act-cut:hover:not(:disabled) { color: var(--c-cut); border-color: var(--c-cut); }
+.pl-act-queue:hover:not(:disabled) { color: var(--accent-2); border-color: var(--accent); }
+
+/* ---------- Search inside a playlist ----------
+   The Vault's search field, smaller. The match count sits inside the
+   field on the right, before the clear button. */
+.pl-find .search { min-height: 42px; font-size: var(--step-0); padding-right: 6.5rem; }
+.pl-find-n {
+  position: absolute; right: 3.4rem; font-size: var(--step--2);
+  color: var(--faint); pointer-events: none; white-space: nowrap;
+}
 
 /* ---------- Empty states ---------- */
 .pl-rows-empty {

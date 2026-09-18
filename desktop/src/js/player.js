@@ -301,6 +301,15 @@ const state = {
   repeat: 'off',
   /** Vault context only: tracks already played, newest last. */
   history: [],
+  /** Tracks asked for next, in order, ahead of whatever the context
+      would pick. Served by next() and by a track ending; the context
+      and its cursor are left alone so the running order carries on
+      afterwards. Session state, like shuffle: not in the resume. */
+  queue: [],
+  /** True while the loaded track came out of the queue rather than the
+      running order, so the bar does not claim a position it does not
+      have. */
+  fromQueue: false,
   /** 'local' for a file on this machine, 'api' for the archive's stream,
       null when there is neither. Drives the visible label in the bar. */
   source: null
@@ -794,9 +803,12 @@ function paintTrack() {
   ui.title.title = track.t;
 
   const bits = [track.c];
-  if (state.context === 'playlist' && state.list.length) {
+  if (state.fromQueue) {
+    bits.push('from the queue');
+  } else if (state.context === 'playlist' && state.list.length) {
     bits.push(`${state.cursor + 1} of ${state.list.length}`);
   }
+  if (state.queue.length) bits.push(`${state.queue.length} queued`);
   if (track.se) bits.push('session edit');
   ui.sub.textContent = bits.join('  ·  ');
 
@@ -1154,6 +1166,51 @@ export function playTrack(track) {
   state.list = [];
   state.order = [];
   state.cursor = -1;
+  state.fromQueue = false;
+  return load(track);
+}
+
+/* ---------- The queue ---------- */
+
+/**
+ * Put a track next in line. With nothing loaded it simply plays.
+ *
+ * Returns how many are waiting, so the page can say so. The queue
+ * survives a change of context: a track queued from a playlist still
+ * comes up after a Vault pick, because that is what asking for it
+ * meant.
+ */
+export function enqueue(track) {
+  if (HOST) return HOST.enqueue(track);
+  if (!track) return state.queue.length;
+  if (!state.track) {
+    playTrack(track);
+    return 0;
+  }
+  state.queue.push(track);
+  note(`Next: ${track.t}`);
+  paintTrack();
+  return state.queue.length;
+}
+
+/** What is waiting, first to play first. A copy. */
+export function queued() {
+  if (HOST) return HOST.queued();
+  return state.queue.slice();
+}
+
+export function clearQueue() {
+  if (HOST) { HOST.clearQueue(); return; }
+  state.queue = [];
+  if (state.track) paintTrack();
+}
+
+/** Take the next queued track. The context's own cursor is untouched,
+    so when this one ends the running order resumes where it was. */
+function serveQueue() {
+  const track = state.queue.shift();
+  if (state.context === 'vault' && state.track) state.history.push(state.track);
+  state.fromQueue = true;
   return load(track);
 }
 
@@ -1169,6 +1226,7 @@ export function playFromPlaylist(playlistId, items, index) {
   state.playlistId = playlistId;
   state.list = items.slice();
   state.history = [];
+  state.fromQueue = false;
   state.order = state.shuffle ? shuffled(state.list.length) : sequential(state.list.length);
 
   if (state.shuffle) {
@@ -1204,6 +1262,14 @@ export function toggle() {
  */
 export function next({ auto = false } = {}) {
   if (HOST) { HOST.next({ auto }); return; }
+
+  // Whatever was asked for comes first, in either context
+  if (state.queue.length) {
+    serveQueue();
+    return;
+  }
+  state.fromQueue = false;
+
   if (state.context === 'playlist') {
     if (!state.list.length) return;
 
@@ -1241,11 +1307,17 @@ export function previous() {
 
   if (state.context === 'playlist') {
     if (!state.list.length) return;
-    state.cursor = state.cursor > 0 ? state.cursor - 1 : state.order.length - 1;
+    // Back from a queued track is the row the order was on, whose
+    // cursor never moved; only from there does it step back.
+    if (!state.fromQueue) {
+      state.cursor = state.cursor > 0 ? state.cursor - 1 : state.order.length - 1;
+    }
+    state.fromQueue = false;
     load(state.list[state.order[state.cursor]]);
     return;
   }
 
+  state.fromQueue = false;
   const back = state.history.pop();
   if (!back) {
     audio.currentTime = 0;
@@ -1316,6 +1388,8 @@ export function stop() {
   state.track = null;
   state.source = null;
   state.history = [];
+  state.queue = [];
+  state.fromQueue = false;
   if (mounted) {
     ui.bar.hidden = true;
     paintOrigin();
@@ -1558,8 +1632,8 @@ function wire() {
 
     // The Vault is a pile, not a running order: reaching the end of a
     // track there is the end of it. Repeat-all is the reader asking
-    // for something else, so that keeps going.
-    if (state.context === 'vault' && state.repeat !== 'all') {
+    // for something else, so that keeps going, and so does a queue.
+    if (state.context === 'vault' && state.repeat !== 'all' && !state.queue.length) {
       paintPlaying(false);
       ui.range.value = '0';
       fill(ui.range);
