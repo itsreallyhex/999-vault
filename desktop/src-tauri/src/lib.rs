@@ -8,6 +8,7 @@
 
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
+mod catalogue;
 mod data;
 mod download;
 mod files;
@@ -27,6 +28,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(presence::Presence::default())
+        .manage(catalogue::Held::default())
         // The pages are read from a folder, not from the binary. See
         // pages.rs for why, and for the rules that find the folder.
         .register_uri_scheme_protocol(pages::SCHEME, pages::serve)
@@ -98,6 +100,8 @@ pub fn run() {
             data::data_root,
             data::read_catalogue,
             data::read_audio_index,
+            catalogue::catalogue_check,
+            catalogue::catalogue_apply,
             download::download_track,
             files::save_text,
             lyrics::lyrics_get,

@@ -19,12 +19,19 @@
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use discord_rich_presence::activity::{Activity, ActivityType, Assets, Timestamps};
+use discord_rich_presence::activity::{Activity, ActivityType, Assets, Button, Timestamps};
 use discord_rich_presence::{DiscordIpc, DiscordIpcClient};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
 use crate::data;
+
+/// The one button on the profile: it opens the project's page. Discord
+/// shows buttons to other people looking at the profile, not to the
+/// person whose profile it is. The label may be 1 to 32 characters and
+/// the address 1 to 512; the test below holds both.
+const BUTTON_LABEL: &str = "Listen with 999 Vault";
+const BUTTON_URL: &str = "https://github.com/itsreallyhex/999-vault";
 
 /// Overrides the config file.
 pub const ENV_ID: &str = "NINE_DISCORD_ID";
@@ -155,7 +162,8 @@ pub fn presence_set(app: AppHandle, presence: State<Presence>, shown: Shown) -> 
         .details(shown.title.as_str())
         .state(shown.line.as_str())
         .timestamps(timestamps)
-        .assets(assets);
+        .assets(assets)
+        .buttons(vec![Button::new(BUTTON_LABEL, BUTTON_URL)]);
 
     let mut guard = presence.client.lock().map_err(|e| e.to_string())?;
     let outcome = match guard.as_mut() {
@@ -214,5 +222,21 @@ pub fn describe(app: &AppHandle) -> String {
         Some(_) if !crate::settings::discord_on(app) => "off (Settings)".into(),
         Some(id) => format!("client id {}", id),
         None => "no client id. Set discord_client_id in the config file, or NINE_DISCORD_ID.".into(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Discord refuses an activity whose button breaks its limits, and
+    /// the presence silently never appears. Hold the two constants to
+    /// them here rather than find out on a profile.
+    #[test]
+    fn the_button_fits_what_discord_accepts() {
+        let label = BUTTON_LABEL.chars().count();
+        assert!((1..=32).contains(&label), "label is {} characters", label);
+        assert!(BUTTON_URL.starts_with("https://"));
+        assert!((1..=512).contains(&BUTTON_URL.len()));
     }
 }

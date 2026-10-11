@@ -34,7 +34,20 @@ const UPDATES_KEY: &str = "updates";
 /// Whether the idle screen may ask LRCLIB for lyrics. See lyrics.rs for
 /// exactly what a request carries. Off still reads a lyrics file.
 const LYRICS_KEY: &str = "lyrics";
+/// Whether the idle "now playing" screen may come up on its own. The
+/// bar's button for it always works.
+const IDLE_KEY: &str = "idle";
+/// Seconds with no input before the idle screen comes up.
+const IDLE_SECONDS_KEY: &str = "idle_seconds";
+/// Seconds of overlap between one song and the next. 0 is off.
+const CROSSFADE_KEY: &str = "crossfade";
 const ROOT_KEY: &str = "data_root";
+
+/// Defaults, and the limits a value is held to on the way in.
+const IDLE_SECONDS_DEFAULT: i64 = 30;
+const IDLE_SECONDS_MIN: i64 = 5;
+const IDLE_SECONDS_MAX: i64 = 3600;
+const CROSSFADE_MAX: i64 = 12;
 
 /// What the Settings page draws.
 #[derive(Serialize, Clone, Debug)]
@@ -46,6 +59,12 @@ pub struct Settings {
     pub updates: bool,
     /// Look lyrics up online for the idle screen. Missing key means yes.
     pub lyrics: bool,
+    /// The idle screen comes up by itself. Missing key means yes.
+    pub idle: bool,
+    /// After this many seconds with no input. Missing key means 30.
+    pub idle_seconds: u32,
+    /// Seconds of overlap between songs, 0 for none. Missing key means 0.
+    pub crossfade: u32,
     /// The version this binary is, for the Settings page to show.
     pub version: String,
     /// The archive as resolved right now, with which rule found it.
@@ -100,6 +119,35 @@ pub fn lyrics_on(app: &AppHandle) -> bool {
         .unwrap_or(true)
 }
 
+/// Whether the idle screen may come up on its own. Missing key means yes.
+pub fn idle_on(app: &AppHandle) -> bool {
+    let (_, doc) = document(app);
+    doc.get(IDLE_KEY)
+        .and_then(|item| item.as_bool())
+        .unwrap_or(true)
+}
+
+/// Seconds of no input before the idle screen. Held to its limits, so
+/// a hand-edited file cannot make it fire every second.
+pub fn idle_seconds(app: &AppHandle) -> u32 {
+    let (_, doc) = document(app);
+    let raw = doc
+        .get(IDLE_SECONDS_KEY)
+        .and_then(|item| item.as_integer())
+        .unwrap_or(IDLE_SECONDS_DEFAULT);
+    raw.clamp(IDLE_SECONDS_MIN, IDLE_SECONDS_MAX) as u32
+}
+
+/// Seconds of crossfade, 0 for none. Held to 0 to 12.
+pub fn crossfade(app: &AppHandle) -> u32 {
+    let (_, doc) = document(app);
+    let raw = doc
+        .get(CROSSFADE_KEY)
+        .and_then(|item| item.as_integer())
+        .unwrap_or(0);
+    raw.clamp(0, CROSSFADE_MAX) as u32
+}
+
 fn current(app: &AppHandle) -> Settings {
     let root = data::data_root(app.clone());
     Settings {
@@ -107,6 +155,9 @@ fn current(app: &AppHandle) -> Settings {
         discord: discord_on(app),
         updates: updates_on(app),
         lyrics: lyrics_on(app),
+        idle: idle_on(app),
+        idle_seconds: idle_seconds(app),
+        crossfade: crossfade(app),
         version: app.package_info().version.to_string(),
         config_file: root.config_file.clone(),
         data_root_setting: data::config_str(app, ROOT_KEY).unwrap_or_default(),
@@ -149,6 +200,27 @@ pub fn settings_set(app: AppHandle, key: String, value: serde_json::Value) -> Re
         LYRICS_KEY => {
             let on = value.as_bool().ok_or("lyrics must be true or false")?;
             doc[LYRICS_KEY] = toml_edit::value(on);
+        }
+        IDLE_KEY => {
+            let on = value.as_bool().ok_or("idle must be true or false")?;
+            doc[IDLE_KEY] = toml_edit::value(on);
+        }
+        IDLE_SECONDS_KEY => {
+            let secs = value.as_i64().ok_or("idle_seconds must be a whole number")?;
+            if !(IDLE_SECONDS_MIN..=IDLE_SECONDS_MAX).contains(&secs) {
+                return Err(format!(
+                    "idle_seconds must be from {} to {}, not {}",
+                    IDLE_SECONDS_MIN, IDLE_SECONDS_MAX, secs
+                ));
+            }
+            doc[IDLE_SECONDS_KEY] = toml_edit::value(secs);
+        }
+        CROSSFADE_KEY => {
+            let secs = value.as_i64().ok_or("crossfade must be a whole number")?;
+            if !(0..=CROSSFADE_MAX).contains(&secs) {
+                return Err(format!("crossfade must be from 0 to {}, not {}", CROSSFADE_MAX, secs));
+            }
+            doc[CROSSFADE_KEY] = toml_edit::value(secs);
         }
         ROOT_KEY => {
             // Empty clears the setting and the lookup rules take over.
