@@ -29,15 +29,26 @@
 import { make, clock } from './utils.js';
 import { buildCover, coverSpec, coverSrc, markWhenReady } from './covers.js';
 import { anyDialogOpen } from './hotkeys.js';
-import { fetchLyrics, activeIndex, trackKey } from './lyrics.js';
+import { fetchLyrics, fetchOtherVersion, activeIndex, trackKey } from './lyrics.js';
 
-/** What the lyrics line says when there are none to show. */
+/** What the lyrics line says when there are none to show. "offline" is
+    only for a request that got no answer at all; a server that answered
+    with an error is "busy", and the screen says which. */
 const LYRICS_NOTE = {
   none: 'No lyrics found',
   off: 'Lyrics lookup is off. Add a .lrc file, or turn it on in Settings.',
-  offline: 'Lyrics are unavailable without a connection',
+  offline: 'Could not reach LRCLIB. Check the connection and try again.',
+  busy: 'LRCLIB is busy right now. Try again in a moment.',
   instrumental: 'Instrumental',
   skip: ''
+};
+
+/** What the line says when asking for another version gave none. */
+const OTHER_NOTE = {
+  only_version: 'LRCLIB has only this version of the lyrics',
+  offline: 'Could not reach LRCLIB for another version',
+  busy: 'LRCLIB is busy, so no other version yet',
+  off: 'The lyrics lookup is off, so no other version'
 };
 
 /** How long with no input before the screen comes up. */
@@ -75,12 +86,17 @@ function makeSlot() {
   const retry = make('button', 'amb-retry', 'Try again');
   retry.type = 'button';
   retry.hidden = true;
-  text.append(title, sub, lyr, src, retry);
+  // Shown beside lyrics from LRCLIB: LRCLIB often holds several different
+  // texts under one name, and only the person knows which is the song.
+  const other = make('button', 'amb-retry amb-other', 'Wrong lyrics? Try another version');
+  other.type = 'button';
+  other.hidden = true;
+  text.append(title, sub, lyr, src, retry, other);
   front.append(art, text);
   el.appendChild(front);
 
   return {
-    el, img, art, title, sub, lyr, src, retry,
+    el, img, art, title, sub, lyr, src, retry, other,
     track: null,     // what the slot holds
     asked: null,     // the key lyrics were last asked for
     lines: null,     // timed lyrics: [{ at, text }]
@@ -101,9 +117,14 @@ function paintLyrics(slot, result, again = false) {
   slot.idx = -2;
   slot.lyr.classList.remove('is-plain');
   // A second try only makes sense where a second look could differ
-  slot.retry.hidden = !(result.state === 'none' || result.state === 'offline');
+  slot.retry.hidden = !(result.state === 'none' || result.state === 'offline' || result.state === 'busy');
   slot.retry.disabled = false;
   slot.retry.textContent = 'Try again';
+  // Another version: only for text that came from LRCLIB, and not once
+  // Rust has said there is just the one
+  slot.other.hidden = true;
+  slot.other.disabled = false;
+  slot.other.textContent = 'Wrong lyrics? Try another version';
 
   if (result.state === 'found') {
     if (result.lines) {
@@ -125,13 +146,30 @@ function paintLyrics(slot, result, again = false) {
       slot.lyr.appendChild(box);
     }
     slot.lyr.hidden = false;
-    slot.src.textContent = result.source === 'file' ? 'Lyrics from a file on this machine' : 'Lyrics from LRCLIB';
+
+    if (result.source === 'file') {
+      slot.src.textContent = 'Lyrics from a file on this machine';
+      return;
+    }
+
+    // Which of the texts this is, once there is more than one
+    let line = 'Lyrics from LRCLIB';
+    if (result.versions > 1 && result.version) line += `, version ${result.version} of ${result.versions}`;
+    // Why asking for another one gave none, kept beside the words
+    if (result.notice && OTHER_NOTE[result.notice]) line = `${OTHER_NOTE[result.notice]}`;
+    slot.src.textContent = line;
+
+    const one = result.versions === 1 || result.notice === 'only_version';
+    slot.other.hidden = one;
     return;
   }
 
   slot.lyr.hidden = true;
+  const detail = result.detail ? ` (${result.detail})` : '';
   if (again && result.state === 'none') slot.src.textContent = 'Asked again, still no lyrics found';
-  else if (again && result.state === 'offline') slot.src.textContent = 'Asked again, still unavailable without a connection';
+  else if (again && result.state === 'offline') slot.src.textContent = `Asked again, still could not reach LRCLIB${detail}`;
+  else if (again && result.state === 'busy') slot.src.textContent = `Asked again, LRCLIB is still busy${detail}`;
+  else if (result.state === 'offline' || result.state === 'busy') slot.src.textContent = `${LYRICS_NOTE[result.state]}${detail}`;
   else slot.src.textContent = LYRICS_NOTE[result.state] || '';
 }
 
@@ -186,6 +224,7 @@ function fillSlot(slot, track) {
   slot.lyr.hidden = true;
   slot.src.textContent = '';
   slot.retry.hidden = true;
+  slot.other.hidden = true;
 }
 
 /** Resolves once the slot's image has loaded or failed, or at once when
@@ -353,6 +392,29 @@ export function initAmbient({ player, frame }) {
   }
   slots.forEach((slot) => slot.retry.addEventListener('click', () => retryLyrics(slot)));
 
+  /** "Wrong lyrics? Try another version": the next of the texts LRCLIB
+      holds under this name, kept for the song. The words are swapped in
+      place when they arrive. */
+  function otherVersion(slot) {
+    const track = slot.track;
+    if (!track) return;
+    const key = trackKey(track);
+    slot.other.disabled = true;
+    slot.other.textContent = 'Looking for another version';
+    fetchOtherVersion(track).then((result) => {
+      if (!slot.track || trackKey(slot.track) !== key) return;
+      if (result.state === 'found') {
+        paintLyrics(slot, result);
+        return;
+      }
+      // Could not turn the page: leave the words, say why
+      slot.other.disabled = false;
+      slot.other.textContent = 'Wrong lyrics? Try another version';
+      slot.src.textContent = OTHER_NOTE[result.state] || 'Could not look for another version';
+    });
+  }
+  slots.forEach((slot) => slot.other.addEventListener('click', () => otherVersion(slot)));
+
   /** A press on a timed line: seek there, and move the highlight now
       rather than at the next half-second tick. Plain lyrics have no
       times, so they have no lines to press. Only the slot on show
@@ -420,10 +482,12 @@ export function initAmbient({ player, frame }) {
     if (event.type !== 'keydown' || anyDialogOpen(frame)) return;
 
     if (event.key === 'Tab') {
-      // Held inside the screen: the X, and "Try again" when it is there
+      // Held inside the screen: the X, and "Try again" and "another
+      // version" when they are there
       event.preventDefault();
       const stops = [close];
       if (!slots[front].retry.hidden) stops.push(slots[front].retry);
+      if (!slots[front].other.hidden) stops.push(slots[front].other);
       const at = stops.indexOf(document.activeElement);
       const step = event.shiftKey ? stops.length - 1 : 1;
       try { stops[(at + step) % stops.length].focus({ preventScroll: true }); } catch { /* fine */ }

@@ -105,6 +105,7 @@ pub fn run() {
             download::download_track,
             files::save_text,
             lyrics::lyrics_get,
+            lyrics::lyrics_other_version,
             update::update_check,
             update::update_install,
             tools::tools_status,

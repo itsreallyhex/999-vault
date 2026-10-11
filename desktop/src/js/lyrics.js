@@ -102,15 +102,25 @@ export function shape(reply) {
 
   if (reply.found) {
     const source = reply.source || 'lrclib';
+    // Which of the texts LRCLIB had this is, when Rust knows; and why
+    // asking for another one did not give one ('only_version', 'busy',
+    // 'offline'), so the screen can say so under the words it keeps.
+    const extra = {
+      version: Number.isFinite(reply.version) ? reply.version : null,
+      versions: Number.isFinite(reply.versions) ? reply.versions : null,
+      notice: reply.reason || null,
+      detail: reply.detail || null
+    };
     const timed = reply.synced ? parseLrc(reply.synced) : [];
-    if (timed.length) return { state: 'found', source, lines: timed, plain: null };
+    if (timed.length) return { state: 'found', source, lines: timed, plain: null, ...extra };
 
     const raw = reply.plain || (reply.synced || '').replace(/^\s*\[[^\]]*\]/gm, '');
     const plain = plainLines(raw);
-    if (plain.length) return { state: 'found', source, lines: null, plain };
+    if (plain.length) return { state: 'found', source, lines: null, plain, ...extra };
   }
   if (reply.instrumental) return { state: 'instrumental' };
-  return { state: reply.reason || 'none' };
+  // `detail` is what the failed request actually got ("status 503")
+  return { state: reply.reason || 'none', detail: reply.detail || null };
 }
 
 /**
@@ -164,4 +174,34 @@ export function fetchLyrics(track, { force = false } = {}) {
 
   inflight.set(key, job);
   return job;
+}
+
+/**
+ * The next version of a song's lyrics, for "Wrong lyrics? Try another
+ * version". LRCLIB often holds several different texts under one name,
+ * and nothing in its data says which is the song, so the person chooses:
+ * each press moves to the next text and Rust keeps the one it lands on.
+ * Resolves to the same shape as fetchLyrics, with `version` and
+ * `versions` set, and `notice: 'only_version'` when there is no other.
+ * Never throws.
+ */
+export function fetchOtherVersion(track) {
+  if (!track || !inTauri || !track.rid) return Promise.resolve({ state: 'skip' });
+
+  const key = trackKey(track);
+  const args = {
+    rid: track.rid,
+    title: track.t,
+    duration: seconds(track.len) || null,
+    alts: Array.isArray(track.a) ? track.a.slice(0, 4) : []
+  };
+
+  return Promise.resolve()
+    .then(() => invoke('lyrics_other_version', args))
+    .then(shape, () => ({ state: 'offline' }))
+    .then((result) => {
+      // What was chosen is what the screen shows from now on
+      if (result.state === 'found') memo.set(key, { at: Date.now(), result });
+      return result;
+    });
 }

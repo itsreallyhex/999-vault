@@ -92,10 +92,20 @@ pub struct Lyrics {
     /// LRCLIB says this one has no words.
     pub instrumental: bool,
     /// Why nothing: "none" (asked, nobody has it), "off" (the lookup is
-    /// off and there is no file), "offline" (the request failed).
+    /// off and there is no file), "offline" (no answer at all: no route,
+    /// a timeout, a dropped connection), "busy" (LRCLIB answered, with an
+    /// error or with something unusable, after the retries), and
+    /// "only_version" (asked for another version and there is none).
     pub reason: Option<String>,
     /// Answered from the kept copy, with no request.
     pub cached: bool,
+    /// What the failed request actually got ("status 503", "timed out"),
+    /// for whoever is wondering why. Never sent anywhere.
+    pub detail: Option<String>,
+    /// How many different texts LRCLIB had for this song, when that is
+    /// known, and which one this is, counting from 1.
+    pub versions: Option<u32>,
+    pub version: Option<u32>,
 }
 
 impl Lyrics {
@@ -238,20 +248,85 @@ fn text_of(item: &serde_json::Value, key: &str) -> Option<String> {
         .map(|s| s.to_string())
 }
 
-/// The best of a search's results for this title and length, or None.
+/// The time of the last `[mm:ss.xx]` stamp in LRC text, in seconds, or 0
+/// when there are none. Tags such as `[ar:Juice WRLD]` do not parse as a
+/// time and are skipped.
+fn last_stamp(lrc: &str) -> f64 {
+    let mut best = 0.0_f64;
+    for line in lrc.lines() {
+        let mut rest = line.trim_start();
+        while rest.starts_with('[') {
+            let Some(end) = rest.find(']') else { break };
+            if let Some(t) = parse_length(&rest[1..end]) {
+                best = best.max(t);
+            }
+            rest = rest[end + 1..].trim_start();
+        }
+    }
+    best
+}
+
+/// LRC text with its stamps taken off, one line after another.
+fn strip_stamps(text: &str) -> String {
+    text.lines()
+        .map(|line| {
+            let mut rest = line.trim_start();
+            while rest.starts_with('[') {
+                match rest.find(']') {
+                    Some(end) => rest = rest[end + 1..].trim_start(),
+                    None => break,
+                }
+            }
+            rest
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// What the words say, with the stamps, case and punctuation gone, so a
+/// timed copy and a plain copy of one text compare as the same, and two
+/// uploads of one text collapse into one version.
+fn text_key(synced: &Option<String>, plain: &Option<String>) -> String {
+    match (synced, plain) {
+        (Some(s), _) => norm(&strip_stamps(s)),
+        (None, Some(p)) => norm(p),
+        _ => String::new(),
+    }
+}
+
+fn pick_key(p: &Pick) -> String {
+    text_key(&p.synced, &p.plain)
+}
+
+/// How many different texts are kept for one song at most, the chosen
+/// one included.
+const MAX_VERSIONS: usize = 5;
+
+/// A search's usable results for this title and length, best first, one
+/// per different text.
 ///
 /// Must be by a "juice" artist and carry the title (exactly, or inside a
-/// longer one). Of those: an exact title first, then one with times,
-/// then the closest length. With a catalogue length to compare, a result
-/// more than MAX_DELTA_SECS off is another recording and is dropped.
-fn pick(items: &[serde_json::Value], name: &str, seconds: Option<f64>) -> Option<Pick> {
+/// longer one). With a catalogue length to compare, a result more than
+/// MAX_DELTA_SECS off is another recording and is dropped.
+///
+/// The order: an exact title, then one with times, then one whose
+/// stamps run for a fair part of the song (a text that ends at 111 s of
+/// a 192 s song is a different, shorter piece with this song's name on
+/// it, which is how "Anxiety" came to show a skit), then the closest
+/// length (within 3 s counts as the same), then the fuller text. LRCLIB
+/// holds many uploads of one name, often with the same text, so uploads
+/// that say the same thing are one version, not a vote.
+fn rank(items: &[serde_json::Value], name: &str, seconds: Option<f64>) -> Vec<Pick> {
     let want = norm(name);
     if want.is_empty() {
-        return None;
+        return Vec::new();
     }
 
-    let mut best: Option<((u8, u8, i64), Pick)> = None;
-    for item in items {
+    // key, then the text it stands for, then the result
+    type Key = (u8, u8, u8, i64, i64, i64, usize);
+    let mut found: Vec<(Key, String, Pick)> = Vec::new();
+
+    for (index, item) in items.iter().enumerate() {
         let artist = norm(item.get("artistName").and_then(|v| v.as_str()).unwrap_or(""));
         if !artist.contains("juice") {
             continue;
@@ -269,7 +344,8 @@ fn pick(items: &[serde_json::Value], name: &str, seconds: Option<f64>) -> Option
             continue;
         }
 
-        let delta = match (seconds, item.get("duration").and_then(|v| v.as_f64())) {
+        let claimed = item.get("duration").and_then(|v| v.as_f64());
+        let delta = match (seconds, claimed) {
             (Some(a), Some(b)) => (a - b).abs(),
             _ => 0.0,
         };
@@ -277,22 +353,109 @@ fn pick(items: &[serde_json::Value], name: &str, seconds: Option<f64>) -> Option
             continue;
         }
 
-        let key = (u8::from(!exact), u8::from(synced.is_none()), (delta * 1000.0) as i64);
-        if best.as_ref().map_or(true, |(k, _)| key < *k) {
-            best = Some((key, Pick { synced, plain, instrumental }));
+        // How much of the song the stamps cover. Plain text has none to
+        // judge by and is given the benefit of the doubt.
+        let length = seconds.or(claimed).filter(|l| *l > 0.0);
+        let span = synced.as_deref().map(last_stamp).filter(|s| *s > 0.0);
+        let fit = match (span, length) {
+            (Some(s), Some(l)) => (s / l).min(1.0),
+            _ => 0.5,
+        };
+
+        let key: Key = (
+            u8::from(!exact),
+            u8::from(synced.is_none()),
+            u8::from(fit < 0.5),
+            (delta / 3.0).floor() as i64,
+            -((fit * 1000.0) as i64),
+            (delta * 1000.0) as i64,
+            index,
+        );
+        let text = text_key(&synced, &plain);
+        found.push((key, text, Pick { synced, plain, instrumental }));
+    }
+
+    found.sort_by(|a, b| a.0.cmp(&b.0));
+
+    // One version per text, the best-ranked upload of each
+    let mut seen: Vec<String> = Vec::new();
+    let mut out: Vec<Pick> = Vec::new();
+    for (_, text, pick) in found {
+        if seen.contains(&text) {
+            continue;
+        }
+        seen.push(text);
+        out.push(pick);
+        if out.len() >= MAX_VERSIONS {
+            break;
         }
     }
-    best.map(|(_, p)| p)
+    out
+}
+
+/// The best of a search's results for this title and length, or None.
+fn pick(items: &[serde_json::Value], name: &str, seconds: Option<f64>) -> Option<Pick> {
+    rank(items, name, seconds).into_iter().next()
+}
+
+/// How a request that came back with nothing usable went wrong. What
+/// the screen says depends on it: "LRCLIB is busy" and "no connection"
+/// are not the same thing to tell someone who is online.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum FailKind {
+    /// LRCLIB answered, with an error status or with something that was
+    /// not a list. A 503 from a busy server is the usual one.
+    Busy,
+    /// No answer at all: no route, no name lookup, a timeout, a
+    /// connection dropped part way.
+    Network,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct Failure {
+    kind: FailKind,
+    /// What the request actually got, for the screen's small print.
+    detail: String,
+    /// Worth asking again straight away. A 404 is not; a 503 is.
+    retry: bool,
+}
+
+impl Failure {
+    fn reason(&self) -> &'static str {
+        match self.kind {
+            FailKind::Busy => "busy",
+            FailKind::Network => "offline",
+        }
+    }
+}
+
+impl std::fmt::Display for Failure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.detail)
+    }
 }
 
 enum Ask {
-    Hit(Pick),
+    /// Every different text found, best first (see rank()).
+    Hit(Vec<Pick>),
     Miss,
-    Failed(String),
+    Failed(Failure),
 }
 
-/// The one request. Blocking; the command runs it on a worker thread.
-fn ask(name: &str, seconds: Option<f64>) -> Ask {
+/// How many times one name is asked for before giving up, and how long
+/// to wait between. A busy server (429 or 5xx) usually answers the next
+/// time; a request that timed out has already cost 8 to 12 seconds, so
+/// it gets one more try and no more.
+fn attempts_for(kind: FailKind) -> usize {
+    match kind {
+        FailKind::Busy => 3,
+        FailKind::Network => 2,
+    }
+}
+const RETRY_WAITS: [Duration; 2] = [Duration::from_millis(500), Duration::from_millis(1500)];
+
+/// One request. Blocking; the command runs it on a worker thread.
+fn ask_once(name: &str) -> Result<Vec<serde_json::Value>, Failure> {
     // No cookie jar (ureq has none unless asked), no referrer, no
     // redirects followed: what is sent is the line and the user agent.
     let agent = ureq::AgentBuilder::new()
@@ -310,20 +473,64 @@ fn ask(name: &str, seconds: Option<f64>) -> Ask {
 
     match response {
         Ok(r) => {
-            let body = match r.into_string() {
-                Ok(b) => b,
-                Err(err) => return Ask::Failed(err.to_string()),
-            };
+            let body = r.into_string().map_err(|err| Failure {
+                kind: FailKind::Network,
+                detail: format!("the answer stopped short: {}", err),
+                retry: true,
+            })?;
             match serde_json::from_str::<serde_json::Value>(&body) {
-                Ok(serde_json::Value::Array(items)) => match pick(&items, name, seconds) {
-                    Some(p) => Ask::Hit(p),
-                    None => Ask::Miss,
-                },
-                _ => Ask::Failed("the answer was not a list".to_string()),
+                Ok(serde_json::Value::Array(items)) => Ok(items),
+                _ => Err(Failure {
+                    kind: FailKind::Busy,
+                    detail: "the answer was not a list".to_string(),
+                    retry: true,
+                }),
             }
         }
-        Err(ureq::Error::Status(code, _)) => Ask::Failed(format!("status {}", code)),
-        Err(ureq::Error::Transport(t)) => Ask::Failed(t.to_string()),
+        Err(ureq::Error::Status(code, _)) => Err(Failure {
+            kind: FailKind::Busy,
+            detail: format!("status {}", code),
+            retry: code == 429 || code >= 500,
+        }),
+        Err(ureq::Error::Transport(t)) => Err(Failure {
+            kind: FailKind::Network,
+            detail: t.to_string(),
+            retry: true,
+        }),
+    }
+}
+
+/// A search for one name, asked again a bounded number of times when it
+/// failed in a way that is worth it. The last failure is what comes back.
+fn ask_items(name: &str) -> Result<Vec<serde_json::Value>, Failure> {
+    let mut tried = 0;
+    loop {
+        match ask_once(name) {
+            Ok(items) => return Ok(items),
+            Err(failure) => {
+                tried += 1;
+                if !failure.retry || tried >= attempts_for(failure.kind) {
+                    return Err(failure);
+                }
+                std::thread::sleep(RETRY_WAITS[(tried - 1).min(RETRY_WAITS.len() - 1)]);
+            }
+        }
+    }
+}
+
+/// A name put to LRCLIB: every different text it had, or nothing, or why
+/// not.
+fn ask(name: &str, seconds: Option<f64>) -> Ask {
+    match ask_items(name) {
+        Ok(items) => {
+            let ranked = rank(&items, name, seconds);
+            if ranked.is_empty() {
+                Ask::Miss
+            } else {
+                Ask::Hit(ranked)
+            }
+        }
+        Err(failure) => Ask::Failed(failure),
     }
 }
 
@@ -371,7 +578,73 @@ fn from_pick(p: &Pick, cached: bool) -> Lyrics {
         instrumental: p.instrumental,
         reason: None,
         cached,
+        ..Default::default()
     }
+}
+
+/// The same, with which version of how many this is.
+fn from_pick_version(p: &Pick, cached: bool, version: u32, versions: u32) -> Lyrics {
+    Lyrics { version: Some(version), versions: Some(versions), ..from_pick(p, cached) }
+}
+
+fn has_text(p: &Pick) -> bool {
+    p.synced.is_some() || p.plain.is_some()
+}
+
+/// What goes in the kept file: the text being shown (at the top level,
+/// where every reader of the file has always looked for it) and the
+/// other versions LRCLIB had, so cycling through them needs no request.
+/// `version` is the place of the shown one in the ring, counting from 1.
+fn entry_for(shown: &Pick, others: &[Pick], version: u32) -> serde_json::Value {
+    let others: Vec<serde_json::Value> = others
+        .iter()
+        .map(|p| serde_json::json!({
+            "synced": p.synced,
+            "plain": p.plain,
+            "instrumental": p.instrumental,
+        }))
+        .collect();
+    serde_json::json!({
+        "found": true,
+        "source": "lrclib",
+        "synced": shown.synced,
+        "plain": shown.plain,
+        "instrumental": shown.instrumental,
+        "checked": now(),
+        "version": version,
+        "others": others,
+    })
+}
+
+/// The text a kept file shows.
+fn pick_of(entry: &serde_json::Value) -> Pick {
+    Pick {
+        synced: text_of(entry, "synced"),
+        plain: text_of(entry, "plain"),
+        instrumental: entry.get("instrumental").and_then(|v| v.as_bool()).unwrap_or(false),
+    }
+}
+
+/// The other versions a kept file holds, empty for a file written before
+/// there were any, or when LRCLIB had one text.
+fn others_of(entry: &serde_json::Value) -> Vec<Pick> {
+    entry
+        .get("others")
+        .and_then(|v| v.as_array())
+        .map(|list| list.iter().map(pick_of).filter(has_text).collect())
+        .unwrap_or_default()
+}
+
+/// Which version a kept file shows and how many there are, when it
+/// knows. A file from before this has no list, so the count is not known
+/// and the screen offers the button, which then asks.
+fn versions_of(entry: &serde_json::Value) -> (Option<u32>, Option<u32>) {
+    if entry.get("others").and_then(|v| v.as_array()).is_none() {
+        return (None, None);
+    }
+    let total = 1 + others_of(entry).len() as u32;
+    let at = entry.get("version").and_then(|v| v.as_u64()).unwrap_or(1) as u32;
+    (Some(at.clamp(1, total)), Some(total))
 }
 
 /// Whether text carries `[mm:ss` stamps, which is what makes it an LRC.
@@ -405,6 +678,7 @@ fn from_text(text: &str) -> Lyrics {
         instrumental: false,
         reason: None,
         cached: false,
+        ..Default::default()
     }
 }
 
@@ -471,7 +745,8 @@ fn get(app: &AppHandle, rid: &str, title: &str, seconds: Option<f64>, alts: &[St
                 instrumental: entry.get("instrumental").and_then(|v| v.as_bool()).unwrap_or(false),
             };
             if pick.synced.is_some() || pick.plain.is_some() || pick.instrumental {
-                return from_pick(&pick, true);
+                let (version, versions) = versions_of(&entry);
+                return Lyrics { version, versions, ..from_pick(&pick, true) };
             }
             // "Try again" ignores a kept miss; a kept hit was returned above
             miss_is_fresh = !force && miss_believed(&entry, now());
@@ -480,6 +755,7 @@ fn get(app: &AppHandle, rid: &str, title: &str, seconds: Option<f64>, alts: &[St
 
     // 2. The lookup
     let mut reason = "none";
+    let mut detail: Option<String> = None;
     if !settings::lyrics_on(app) {
         reason = "off";
     } else if !miss_is_fresh {
@@ -512,26 +788,23 @@ fn get(app: &AppHandle, rid: &str, title: &str, seconds: Option<f64>, alts: &[St
                 std::thread::sleep(BETWEEN_ASKS);
             }
             match ask(name, ask_seconds) {
-                Ask::Hit(p) => {
+                Ask::Hit(mut picks) => {
+                    // The best text is shown; the others are kept
+                    // beside it so "another version" needs no request.
+                    let best = picks.remove(0);
                     if let Some(d) = &dir {
-                        write_cache(d, rid, &serde_json::json!({
-                            "found": true,
-                            "source": "lrclib",
-                            "synced": p.synced,
-                            "plain": p.plain,
-                            "instrumental": p.instrumental,
-                            "checked": now(),
-                        }));
+                        write_cache(d, rid, &entry_for(&best, &picks, 1));
                     }
-                    return from_pick(&p, false);
+                    return from_pick_version(&best, false, 1, 1 + picks.len() as u32);
                 }
                 Ask::Miss => {}
-                Ask::Failed(why) => {
-                    // Not kept: a dropped connection is not "nobody has
-                    // it", and a miss on the first name proves nothing
-                    // if the second could not be asked
-                    println!("999: lyrics    lookup failed ({})", why);
-                    reason = "offline";
+                Ask::Failed(failure) => {
+                    // Not kept: a dropped connection or a busy server is
+                    // not "nobody has it", and a miss on the first name
+                    // proves nothing if the second could not be asked
+                    println!("999: lyrics    lookup failed ({})", failure);
+                    reason = failure.reason();
+                    detail = Some(failure.detail.clone());
                     every_name_missed = false;
                     break;
                 }
@@ -555,7 +828,98 @@ fn get(app: &AppHandle, rid: &str, title: &str, seconds: Option<f64>, alts: &[St
     if let Some(found) = from_file(app, dir.as_deref(), rid, title) {
         return found;
     }
-    Lyrics::nothing(reason)
+    Lyrics { detail, ..Lyrics::nothing(reason) }
+}
+
+/// The next version of a song's lyrics, for "Wrong lyrics? Try another
+/// version". LRCLIB often holds several different texts under one name
+/// (a skit uploaded as the song, a different cut), and nothing in the
+/// data says which is right, so the person chooses and the choice is
+/// kept.
+///
+/// A kept answer that carries its other versions turns the ring with no
+/// request. One that does not (written before versions were kept, or
+/// when LRCLIB had one text) asks again once, keeps what it finds, and
+/// then turns. The shown text always moves to the back of the ring, so
+/// pressing enough times comes round to where it started.
+fn other_version(app: &AppHandle, rid: &str, title: &str, seconds: Option<f64>, alts: &[String]) -> Lyrics {
+    if !valid_rid(rid) {
+        return Lyrics::nothing("none");
+    }
+    let Some(dir) = lyrics_dir(app) else { return Lyrics::nothing("none") };
+    let Some(entry) = read_cache(&dir, rid) else { return Lyrics::nothing("none") };
+
+    let mut current = pick_of(&entry);
+    if !has_text(&current) {
+        return Lyrics::nothing("none");
+    }
+    let mut others = others_of(&entry);
+    let mut version = entry.get("version").and_then(|v| v.as_u64()).unwrap_or(1) as u32;
+
+    if others.is_empty() {
+        // Nothing kept to turn to. The lookup is the person's to switch
+        // off, and that holds here too.
+        if !settings::lyrics_on(app) {
+            return Lyrics {
+                reason: Some("off".into()),
+                versions: Some(1),
+                version: Some(1),
+                ..from_pick(&current, true)
+            };
+        }
+
+        let record = data::read_json(app, "catalogue.json").ok().and_then(|c| known_in(&c, rid));
+        let (ask_title, ask_alts, ask_seconds) = match &record {
+            Some(k) => (
+                k.title.clone(),
+                if k.alts.is_empty() { alts.to_vec() } else { k.alts.clone() },
+                seconds.or(k.seconds),
+            ),
+            None => (title.to_string(), alts.to_vec(), seconds),
+        };
+
+        let mine = pick_key(&current);
+        let mut failure: Option<Failure> = None;
+        for (n, name) in candidates(&ask_title, &ask_alts).iter().enumerate() {
+            if n > 0 {
+                std::thread::sleep(BETWEEN_ASKS);
+            }
+            match ask(name, ask_seconds) {
+                Ask::Hit(picks) => {
+                    others = picks.into_iter().filter(|p| pick_key(p) != mine).collect();
+                    break;
+                }
+                Ask::Miss => {}
+                Ask::Failed(f) => {
+                    failure = Some(f);
+                    break;
+                }
+            }
+        }
+
+        if others.is_empty() {
+            let mut out = from_pick_version(&current, true, 1, 1);
+            match failure {
+                Some(f) => {
+                    out.reason = Some(f.reason().to_string());
+                    out.detail = Some(f.detail);
+                }
+                None => out.reason = Some("only_version".to_string()),
+            }
+            // Remember there is only the one, so the button goes away
+            write_cache(&dir, rid, &entry_for(&current, &[], 1));
+            return out;
+        }
+        version = 1;
+    }
+
+    // Turn the ring: the shown text goes to the back, the next comes up
+    let total = 1 + others.len() as u32;
+    others.push(current);
+    current = others.remove(0);
+    version = if version >= total { 1 } else { version + 1 };
+    write_cache(&dir, rid, &entry_for(&current, &others, version));
+    from_pick_version(&current, true, version, total)
 }
 
 /// Lyrics for one record. Async so the webview is not held while the
@@ -581,6 +945,25 @@ pub async fn lyrics_get(
     let alts = alts.unwrap_or_default();
     let force = force.unwrap_or(false);
     tauri::async_runtime::spawn_blocking(move || get(&app, &rid, &title, seconds, &alts, force))
+        .await
+        .unwrap_or_else(|_| Lyrics::nothing("none"))
+}
+
+/// The next version of a song's lyrics ("Wrong lyrics? Try another
+/// version"). Same arguments as `lyrics_get`, minus `force`. Turns
+/// through the versions kept for the song, asking once when none are
+/// kept, and keeps the one it lands on.
+#[tauri::command]
+pub async fn lyrics_other_version(
+    app: AppHandle,
+    rid: String,
+    title: String,
+    duration: Option<f64>,
+    alts: Option<Vec<String>>,
+) -> Lyrics {
+    let seconds = duration.filter(|d| d.is_finite() && *d > 0.0);
+    let alts = alts.unwrap_or_default();
+    tauri::async_runtime::spawn_blocking(move || other_version(&app, &rid, &title, seconds, &alts))
         .await
         .unwrap_or_else(|_| Lyrics::nothing("none"))
 }
@@ -715,6 +1098,89 @@ mod tests {
         assert!(pick(&[item("Juice WRLD", "Robbery", 240.0, None, None)], "Robbery", None).is_none());
     }
 
+    /// Anxiety, 2026-10-11: nineteen uploads under one name and one
+    /// length, eighteen of them the same short text that stops long
+    /// before the song does, and one the real song. The first-listed
+    /// tie used to win, and the short text was shown.
+    #[test]
+    fn a_text_that_covers_the_song_beats_one_that_stops_early() {
+        let short = "[00:05.00]a\n[00:50.00]b\n[01:51.40]c";
+        let full = "[00:12.00]one\n[01:00.00]two\n[02:33.30]three";
+        let mut items: Vec<serde_json::Value> = (0..5)
+            .map(|_| item("Juice WRLD", "Anxiety", 192.0, Some(short), None))
+            .collect();
+        items.push(item("Juice WRLD", "Anxiety", 192.0, Some(full), None));
+
+        let ranked = rank(&items, "Anxiety", Some(192.0));
+        assert_eq!(ranked.len(), 2, "five uploads of one text are one version");
+        assert_eq!(ranked[0].synced.as_deref(), Some(full), "the fuller text comes first");
+        assert_eq!(ranked[1].synced.as_deref(), Some(short));
+        assert_eq!(pick(&items, "Anxiety", Some(192.0)).unwrap().synced.as_deref(), Some(full));
+
+        // The same two, the other way round in the list: same answer
+        items.reverse();
+        assert_eq!(pick(&items, "Anxiety", Some(192.0)).unwrap().synced.as_deref(), Some(full));
+    }
+
+    #[test]
+    fn a_timed_copy_and_a_plain_copy_of_one_text_are_one_version() {
+        let items = vec![
+            item("Juice WRLD", "Robbery", 240.0, Some("[00:01.00]Hello there\n[00:09.00]Goodbye"), None),
+            item("Juice WRLD", "Robbery", 240.0, None, Some("hello there\ngoodbye")),
+            item("Juice WRLD", "Robbery", 240.0, None, Some("something else entirely")),
+        ];
+        let ranked = rank(&items, "Robbery", Some(240.0));
+        assert_eq!(ranked.len(), 2);
+        assert!(ranked[0].synced.is_some(), "the timed one is the one kept of the pair");
+        assert_eq!(ranked[1].plain.as_deref(), Some("something else entirely"));
+    }
+
+    #[test]
+    fn stamps_are_read_and_tags_are_not() {
+        assert_eq!(last_stamp("[ar:Juice WRLD]\n[00:12.50]a\n[01:02.25]b"), 62.25);
+        assert_eq!(last_stamp("[00:10.00][02:30.00]chorus\n[00:20.00]x"), 150.0);
+        assert_eq!(last_stamp("no stamps here"), 0.0);
+        assert_eq!(strip_stamps("[00:10.00][00:11.00]hello\n[00:20.00] world"), "hello world");
+    }
+
+    #[test]
+    fn a_failure_says_what_it_was() {
+        let busy = Failure { kind: FailKind::Busy, detail: "status 503".into(), retry: true };
+        let down = Failure { kind: FailKind::Network, detail: "dns".into(), retry: true };
+        assert_eq!(busy.reason(), "busy");
+        assert_eq!(down.reason(), "offline");
+        assert_eq!(busy.to_string(), "status 503");
+        // a busy server gets three tries, a request that timed out two
+        assert_eq!(attempts_for(FailKind::Busy), 3);
+        assert_eq!(attempts_for(FailKind::Network), 2);
+    }
+
+    #[test]
+    fn a_kept_answer_carries_its_other_versions_and_reads_back() {
+        let a = Pick { synced: Some("[00:01.00]a".into()), plain: None, instrumental: false };
+        let b = Pick { synced: None, plain: Some("b words".into()), instrumental: false };
+        let c = Pick { synced: Some("[00:02.00]c".into()), plain: None, instrumental: false };
+
+        let entry = entry_for(&a, &[b.clone(), c.clone()], 1);
+        assert_eq!(pick_of(&entry), a);
+        assert_eq!(others_of(&entry), vec![b.clone(), c.clone()]);
+        assert_eq!(versions_of(&entry), (Some(1), Some(3)));
+
+        // an old file: the text and nothing about versions
+        let old = json!({ "found": true, "source": "lrclib", "synced": "[00:01.00]a", "checked": 5 });
+        assert_eq!(versions_of(&old), (None, None));
+        assert!(others_of(&old).is_empty());
+        assert_eq!(pick_of(&old).synced.as_deref(), Some("[00:01.00]a"));
+
+        // only the one: known to be only the one
+        let only = entry_for(&a, &[], 1);
+        assert_eq!(versions_of(&only), (Some(1), Some(1)));
+
+        // a version number past the end is held to it
+        let odd = entry_for(&a, &[b], 9);
+        assert_eq!(versions_of(&odd), (Some(2), Some(2)));
+    }
+
     /// Asks the real LRCLIB, so it is ignored unless named:
     /// `cargo test --lib live_ -- --ignored --nocapture`
     #[test]
@@ -726,13 +1192,60 @@ mod tests {
         let mut hit = false;
         for name in &names {
             match ask(name, Some(144.0)) {
-                Ask::Hit(p) => { hit = true; println!("{:?} -> HIT (timed: {}, plain: {})", name, p.synced.is_some(), p.plain.is_some()); }
+                Ask::Hit(p) => {
+                    hit = true;
+                    println!("{:?} -> HIT, {} version(s) (best timed: {}, plain: {})",
+                        name, p.len(), p[0].synced.is_some(), p[0].plain.is_some());
+                }
                 Ask::Miss => println!("{:?} -> miss", name),
-                Ask::Failed(why) => println!("{:?} -> FAILED: {}", name, why),
+                Ask::Failed(why) => println!("{:?} -> FAILED: {} ({})", name, why, why.reason()),
             }
             std::thread::sleep(BETWEEN_ASKS);
         }
         assert!(hit, "no name found lyrics");
+    }
+
+    /// A song LRCLIB has no lyrics for must come back as a miss, and a
+    /// busy server must be retried, not reported as "no connection".
+    /// Found 2026-10-11 from a screenshot ("Holes (Remaster)" said
+    /// "unavailable without a connection" while the machine was online).
+    /// Prints what each request did and how long it took.
+    #[test]
+    #[ignore]
+    fn live_a_plain_miss_is_not_a_failure() {
+        let mut failed = Vec::new();
+        for round in 0..4 {
+            for name in ["Holes", "Lucid Dreams", "Zzzz Not A Song"] {
+                let started = std::time::Instant::now();
+                let outcome = match ask(name, Some(121.0)) {
+                    Ask::Hit(v) => format!("HIT ({} versions)", v.len()),
+                    Ask::Miss => "miss".to_string(),
+                    Ask::Failed(f) => { failed.push((round, name, f.to_string())); format!("FAILED: {} [{}]", f, f.reason()) }
+                };
+                println!("round {} {:?} -> {} ({} ms)", round, name, outcome, started.elapsed().as_millis());
+                std::thread::sleep(BETWEEN_ASKS);
+            }
+        }
+        assert!(failed.is_empty(), "requests failed even after retrying: {:?}", failed);
+    }
+
+    /// The case the ranking was written for, against the real database:
+    /// "Anxiety" at 3:12 has many uploads of a short skit and one of the
+    /// song, whose chorus the owner supplied. The song must come first,
+    /// and the skit must still be there as the other version.
+    #[test]
+    #[ignore]
+    fn live_anxiety_picks_the_real_song() {
+        match ask("Anxiety", Some(192.0)) {
+            Ask::Hit(versions) => {
+                println!("{} versions", versions.len());
+                let first = pick_key(&versions[0]);
+                assert!(first.contains("bad for the soul"), "the first version is not the song");
+                assert!(versions.len() >= 2, "the skit should be kept as another version");
+            }
+            Ask::Miss => panic!("LRCLIB had nothing for Anxiety"),
+            Ask::Failed(f) => panic!("the request failed even after retrying: {}", f),
+        }
     }
 
     #[test]
