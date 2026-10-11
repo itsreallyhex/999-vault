@@ -348,6 +348,9 @@ const state = {
       running order, so the bar does not claim a position it does not
       have. */
   fromQueue: false,
+  /** Vault only: the random song Next will play, picked early so the
+      Up next panel can say what it is. Next uses it and clears it. */
+  peek: null,
   /** 'local' for a file on this machine, 'api' for the archive's stream,
       null when there is neither. Drives the visible label in the bar. */
   source: null
@@ -1637,6 +1640,9 @@ async function load(track, { autoplay = true, at = 0, resumeId = null } = {}) {
   // What the lab remembers for this song, or for every song
   labFor(track);
 
+  // A song picked ahead for Next that is now the one playing is spent
+  if (state.peek && sameTrack(state.peek, track)) state.peek = null;
+
   mount();
   ui.bar.hidden = false;
   document.body.classList.add('has-player');
@@ -1647,6 +1653,8 @@ async function load(track, { autoplay = true, at = 0, resumeId = null } = {}) {
   // pages move their mark now and the play event lights it up.
   notify();
   labChanged();
+  // The running order or the song moved, so what is coming up did too
+  notifyUpNext();
 
   if (!src) {
     // Nothing to hand over to: the song that was fading out stops here
@@ -1827,6 +1835,7 @@ function queueChanged() {
   queueListeners.forEach((fn) => {
     try { fn(entries); } catch { /* a panel must not take the player down */ }
   });
+  notifyUpNext();
 }
 
 /** Be told whenever the queue changes, and once straight away.
@@ -1840,6 +1849,91 @@ export function onQueue(fn) {
   queueListeners.add(fn);
   fn(queueEntries());
   return () => queueListeners.delete(fn);
+}
+
+/**
+ * What will play after this, in the order it will play.
+ *
+ *   queue   what was asked for, as { qid, track }. Plays first.
+ *   then    what carries on after the queue:
+ *             kind 'playlist'    the rest of the running order, in the
+ *                                shuffled order when shuffle is on, and
+ *                                round to the start when repeat is all
+ *             kind 'vault'       the one random song Next will pick,
+ *                                chosen now so it can be named
+ *             kind 'repeat-one'  this song again
+ *             kind 'none'        nothing: the end of the list, or
+ *                                nothing is loaded
+ *           with `tracks` (at most `limit`) and `more`, how many more
+ *           follow past those.
+ */
+export function upNext(limit = 50) {
+  if (HOST) return HOST.upNext(limit);
+
+  const queue = state.queue.map((entry) => ({ qid: entry.qid, track: entry.track }));
+  const none = { kind: 'none', tracks: [], more: 0 };
+  if (!state.track) return { queue, then: none };
+
+  if (state.repeat === 'one') {
+    return { queue, then: { kind: 'repeat-one', tracks: [state.track], more: 0 } };
+  }
+
+  if (state.context === 'playlist' && state.list.length && state.order.length) {
+    const n = state.order.length;
+    const tracks = [];
+    // The current song is order[cursor]; what follows is the cursor
+    // moving on, and with repeat all it goes round to the start. Stops
+    // before it would reach the current song again.
+    for (let k = 1; k < n && tracks.length < limit; k++) {
+      let at = state.cursor + k;
+      if (at >= n) {
+        if (state.repeat !== 'all') break;
+        at -= n;
+      }
+      const track = state.list[state.order[at]];
+      if (track) tracks.push(track);
+    }
+    const reachable = state.repeat === 'all' ? n - 1 : Math.max(0, n - 1 - state.cursor);
+    return {
+      queue,
+      then: { kind: tracks.length ? 'playlist' : 'none', tracks, more: Math.max(0, reachable - tracks.length) }
+    };
+  }
+
+  if (state.context === 'vault') {
+    // Only when the queue is empty is this the next song, but naming it
+    // early costs nothing and next() uses the same pick.
+    if (!state.peek) {
+      try { state.peek = randomTrack(); } catch { state.peek = null; }
+    }
+    if (state.peek) return { queue, then: { kind: 'vault', tracks: [state.peek], more: 0 } };
+  }
+  return { queue, then: none };
+}
+
+const upNextListeners = new Set();
+
+function notifyUpNext() {
+  if (!upNextListeners.size) return;
+  let snap;
+  try { snap = upNext(); } catch { return; }
+  upNextListeners.forEach((fn) => {
+    try { fn(snap); } catch { /* a panel must not take the player down */ }
+  });
+}
+
+/** Be told whenever what is coming up changes (the queue, the running
+    order, shuffle, repeat, the song), and once straight away. Returns
+    the unsubscribe. */
+export function onUpNext(fn) {
+  if (HOST) {
+    const off = HOST.onUpNext(fn);
+    window.addEventListener('pagehide', off, { once: true });
+    return off;
+  }
+  upNextListeners.add(fn);
+  try { fn(upNext()); } catch { /* as above */ }
+  return () => upNextListeners.delete(fn);
 }
 
 /** The count on the bar's queue button. */
@@ -1989,7 +2083,9 @@ export function next({ auto = false } = {}) {
     return;
   }
 
-  const pick = randomTrack();
+  // The song the Up next panel already named, if there is one
+  const pick = state.peek || randomTrack();
+  state.peek = null;
   if (!pick) {
     ui.status.textContent = 'Nothing left to play in this filter';
     return;
@@ -2047,6 +2143,8 @@ export function toggleShuffle() {
   ui.shuffle.classList.toggle('is-on', state.shuffle);
   ui.status.textContent = state.shuffle ? 'Shuffle on' : 'Shuffle off';
   if (state.track) paintTrack();
+  // Shuffling re-deals the running order, so what is next changed
+  notifyUpNext();
   return state.shuffle;
 }
 
@@ -2073,6 +2171,8 @@ export function cycleRepeat() {
   ui.status.textContent = `Repeat ${state.repeat}`;
   // Discord's line says "On repeat" for repeat-one, so it changes here.
   presenceSync();
+  // Repeat all wraps the running order, repeat one is this song again
+  notifyUpNext();
 }
 
 /** Stop and put the bar away. The audio is released, not just paused. */
