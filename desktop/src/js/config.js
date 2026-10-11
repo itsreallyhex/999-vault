@@ -30,8 +30,11 @@ export const PAGE_SIZE = 60;
     alternate name, so it is worth not running it on every keystroke. */
 export const SEARCH_DELAY = 160;
 
-/** Categories the archive uses, in the order they appear as filter chips. */
-export const CATEGORIES = ['main', 'instrumental', 'stem', 'cut', 'released', 'remaster'];
+/** Categories the archive uses, in the order they appear as filter chips.
+    A category not listed here is still shown under All, but has no chip
+    and no colour: acapella and freestyle appeared in the archive on
+    2026-10-09 and were missing here until the catalogue was synced. */
+export const CATEGORIES = ['main', 'instrumental', 'stem', 'cut', 'released', 'remaster', 'acapella', 'freestyle'];
 
 /** Generated-cover palettes: [base, mid, detail].
     Each is dark enough at the base to carry a light mark. */
