@@ -7,7 +7,7 @@
 
 import { CATEGORIES } from './config.js';
 import { make, niceDate, group } from './utils.js';
-import { buildCover, coverSrc } from './covers.js';
+import { buildCover, coverSrc, placeholderCovers } from './covers.js';
 
 /**
  * Element references, bound once from the ids in vault.html.
@@ -89,12 +89,16 @@ function sample(list) {
 /**
  * Stems and instrumentals reuse a single generic placeholder image across
  * the whole category, so pulling from everything makes the strip repeat the
- * same grey cover. Draw from `main`, which has real per-track artwork.
+ * same grey cover. Draw from `main`, which mostly has real per-track
+ * artwork, and leave out any image too many entries share: one of them
+ * sits on 387 main entries and would come up as often as it is common.
  */
 function coverPool(data) {
-  const main = data.filter((t) => t.c === 'main' && t.cov);
+  const shared = placeholderCovers(data);
+  const own = (t) => t.cov && !shared.has(t.cov);
+  const main = data.filter((t) => t.c === 'main' && own(t));
   if (main.length) return main;
-  const withArt = data.filter((t) => t.cov || t.art);
+  const withArt = data.filter((t) => own(t) || t.art);
   return withArt.length ? withArt : data;
 }
 

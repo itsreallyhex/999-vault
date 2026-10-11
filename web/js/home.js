@@ -23,7 +23,7 @@
 
 import { fetchCatalogue } from './api.js';
 import { SEED } from './seed.js';
-import { buildAssignments, buildCover } from './covers.js';
+import { buildAssignments, buildCover, placeholderCovers } from './covers.js';
 import { renderStrip } from './ui.js';
 import { make, group } from './utils.js';
 
@@ -77,12 +77,15 @@ function renderSwatches() {
 /**
  * Stems and instrumentals reuse a single generic placeholder image
  * across the whole category, so drawing from everything would repeat
- * the same grey cover. `main` is the one category where every entry has
- * its own artwork.
+ * the same grey cover. `main` is where nearly every entry has its own
+ * artwork; the exception is one image on 387 of its 2,097, so any image
+ * that many entries share is left out of the pool.
  */
 function coverPool(data) {
-  const main = data.filter((t) => t.c === 'main' && t.cov);
-  return main.length ? main : data.filter((t) => t.cov);
+  const shared = placeholderCovers(data);
+  const own = (t) => t.cov && !shared.has(t.cov);
+  const main = data.filter((t) => t.c === 'main' && own(t));
+  return main.length ? main : data.filter(own);
 }
 
 /** `n` distinct random tracks, or fewer if the pool is smaller. */

@@ -11,6 +11,30 @@
 import { PALETTES, COMPOSITIONS } from './config.js';
 import { hash, make } from './utils.js';
 
+/** An image used by this many entries or more is a placeholder, not
+    artwork: measured 2026-10-11, one image sat on 387 of the 2,097 main
+    entries and the next largest on 724 instrumentals, while no real
+    cover is shared by more than a handful of versions of one song. */
+const PLACEHOLDER_AT = 10;
+
+/**
+ * The cover paths that too many entries share to be anyone's artwork.
+ *
+ * A saved catalogue names covers by the hash of their bytes, so the same
+ * image is the same string and counting strings finds it. A live listing
+ * gives every record its own `/cdn/...` path whatever the image is, so
+ * nothing is found there and nothing is filtered: no worse than before.
+ */
+export function placeholderCovers(data) {
+  const used = new Map();
+  data.forEach((t) => {
+    if (t.cov) used.set(t.cov, (used.get(t.cov) || 0) + 1);
+  });
+  const out = new Set();
+  used.forEach((n, cov) => { if (n >= PLACEHOLDER_AT) out.add(cov); });
+  return out;
+}
+
 /** title -> { art, pal }. Rebuilt whenever the dataset changes. */
 let assignments = {};
 
