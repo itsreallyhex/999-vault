@@ -27,6 +27,8 @@ import { initPlayer, applySettings } from './player.js';
 
 const el = {};
 ['discord', 'discordWord', 'updates', 'updatesWord', 'lyrics', 'lyricsWord', 'versionLine', 'checkUpdates',
+  'idle', 'idleWord', 'idleSeconds', 'crossfade',
+  'catCheck', 'catResult', 'catSum', 'catList', 'catMore', 'catApply', 'catClose',
   'rootPath', 'rootFound', 'rootBy', 'pickRoot', 'clearRoot',
   'restartNote', 'cfgPath', 'status', 'summary']
   .forEach((id) => { el[id] = document.getElementById(id); });
@@ -40,6 +42,9 @@ const DEFAULTS = {
   discord: true,
   updates: true,
   lyrics: true,
+  idle: true,
+  idle_seconds: 30,
+  crossfade: 0,
   version: '',
   data_root: { path: '', source: 'not found', exists: false, catalogue: false, covers: false, audio: false, audio_index: false },
   data_root_setting: '',
@@ -79,6 +84,20 @@ function setChip(k, text, state) {
   }
 }
 
+/** Select the option holding `value`. A value the list does not offer
+    (a hand-edited file) is added, so what is shown is what is saved. */
+function pick(select, value) {
+  const want = String(value);
+  let opt = [...select.options].find((o) => o.value === want);
+  if (!opt) {
+    opt = document.createElement('option');
+    opt.value = want;
+    opt.textContent = `${want} seconds`;
+    select.appendChild(opt);
+  }
+  select.value = want;
+}
+
 function draw(s) {
   sources.forEach((input) => { input.checked = input.value === s.source; });
   setChip('source', s.source === 'stream' ? 'Stream first' : 'Local first', 'on');
@@ -96,6 +115,15 @@ function draw(s) {
   const lyrics = s.lyrics !== false;
   el.lyrics.checked = lyrics;
   el.lyricsWord.textContent = lyrics ? el.lyricsWord.dataset.on : el.lyricsWord.dataset.off;
+
+  // A binary older than these settings does not send the keys: the
+  // defaults (screen on, 30 seconds, no crossfade) are what it did
+  const idle = s.idle !== false;
+  el.idle.checked = idle;
+  el.idleWord.textContent = idle ? el.idleWord.dataset.on : el.idleWord.dataset.off;
+  pick(el.idleSeconds, Number.isFinite(s.idle_seconds) ? s.idle_seconds : 30);
+  el.idleSeconds.disabled = !idle;
+  pick(el.crossfade, Number.isFinite(s.crossfade) ? s.crossfade : 0);
 
   const root = s.data_root;
   ['catalogue', 'covers', 'audio'].forEach((k) => { held(k).dataset.on = String(Boolean(root[k])); });
@@ -122,7 +150,13 @@ async function set(key, value) {
   try {
     const next = await invoke('settings_set', { key, value });
     draw(next);
-    applySettings({ source: next.source, discord: next.discord });
+    applySettings({
+      source: next.source,
+      discord: next.discord,
+      idle: next.idle,
+      idleSeconds: next.idle_seconds,
+      crossfade: next.crossfade
+    });
     say('Saved');
     return true;
   } catch (err) {
@@ -132,7 +166,87 @@ async function set(key, value) {
   }
 }
 
+/* ---------- Song list ----------
+   Two steps, both the person's: a check that only reads, and an
+   update that writes what the check showed. The shell's Rust holds the
+   listing between them, so what is applied is what was on screen. */
+
+const num = (n) => Number(n).toLocaleString('en-US');
+
+function drawCheck(r) {
+  el.catResult.hidden = false;
+  el.catList.textContent = '';
+  el.catMore.hidden = true;
+
+  if (r.unchanged) {
+    el.catSum.textContent = `Your list is up to date: ${num(r.saved_count)} songs.`;
+    el.catApply.hidden = true;
+    el.catClose.textContent = 'Close';
+    return;
+  }
+
+  const bits = [];
+  if (r.added_total) bits.push(`${num(r.added_total)} new`);
+  if (r.removed_total) bits.push(`${num(r.removed_total)} no longer listed`);
+  if (r.edited_total) bits.push(`${num(r.edited_total)} edited`);
+  el.catSum.textContent = `The archive lists ${num(r.live_count)} songs and your list has ${num(r.saved_count)}: ${bits.join(', ')}.`;
+
+  r.added.forEach((s) => {
+    const li = document.createElement('li');
+    li.textContent = s.category ? `${s.title} (${s.category})` : s.title;
+    el.catList.appendChild(li);
+  });
+  const more = r.added_total - r.added.length;
+  const notes = [];
+  if (more > 0) notes.push(`and ${num(more)} more new songs`);
+  if (r.new_categories.length) {
+    notes.push(`New ${r.new_categories.length === 1 ? 'category' : 'categories'}: ${r.new_categories.join(', ')}. It shows under All and gets its own filter.`);
+  }
+  if (r.removed_total) notes.push('Songs no longer listed leave the list, but any audio you saved stays on disk.');
+  el.catMore.textContent = notes.join(' ');
+  el.catMore.hidden = notes.length === 0;
+
+  el.catApply.hidden = false;
+  el.catApply.disabled = false;
+  el.catClose.textContent = 'Not now';
+}
+
+async function checkList() {
+  el.catCheck.disabled = true;
+  say('Asking the archive');
+  try {
+    drawCheck(await invoke('catalogue_check'));
+    say('Checked');
+  } catch (err) {
+    say(String(err), true);
+  } finally {
+    el.catCheck.disabled = false;
+  }
+}
+
+async function applyList() {
+  el.catApply.disabled = true;
+  try {
+    const a = await invoke('catalogue_apply');
+    el.catSum.textContent = `Updated: your list now has ${num(a.count)} songs`
+      + (a.added ? `, ${num(a.added)} of them new` : '')
+      + '. Open the Vault to see them.';
+    el.catList.textContent = '';
+    el.catMore.hidden = true;
+    el.catApply.hidden = true;
+    el.catClose.textContent = 'Close';
+    say('List updated');
+  } catch (err) {
+    say(String(err), true);
+    el.catApply.disabled = false;
+  }
+}
+
 function wire() {
+  el.catCheck.addEventListener('click', checkList);
+  el.catApply.addEventListener('click', applyList);
+  el.catClose.addEventListener('click', () => { el.catResult.hidden = true; });
+
   sources.forEach((input) => {
     input.addEventListener('change', () => { if (input.checked) set('source', input.value); });
   });
@@ -140,6 +254,9 @@ function wire() {
   el.discord.addEventListener('change', () => set('discord', el.discord.checked));
   el.updates.addEventListener('change', () => set('updates', el.updates.checked));
   el.lyrics.addEventListener('change', () => set('lyrics', el.lyrics.checked));
+  el.idle.addEventListener('change', () => set('idle', el.idle.checked));
+  el.idleSeconds.addEventListener('change', () => set('idle_seconds', Number(el.idleSeconds.value)));
+  el.crossfade.addEventListener('change', () => set('crossfade', Number(el.crossfade.value)));
 
   // The check lives in the shell, which owns the pop-up. A newer
   // version opens it there; anything else is a line here.

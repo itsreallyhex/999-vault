@@ -237,8 +237,46 @@ body.has-player .set-toast { bottom: calc(var(--mini-h, 0px) + 1.25rem); }
 .set-toast.is-shown { opacity: 1; transform: translate(-50%, 0); }
 .set-toast[data-state="bad"] { border-color: color-mix(in srgb, var(--c-cut) 60%, var(--line-2)); color: var(--c-cut); }
 
+/* A choice list under or beside a switch: the delay, the crossfade */
+.set-pick { display: flex; align-items: center; gap: 0.75rem; }
+.set-sub { font-size: var(--step--1); color: var(--dim); }
+.set-pick select:disabled { opacity: 0.5; cursor: default; }
+
+/* The result of checking for new songs */
+.cat-result {
+  margin-top: 1rem; padding: 0.9rem 1rem;
+  background: var(--bg-3); border: 1px solid var(--line); border-radius: var(--r);
+}
+.cat-sum { margin: 0 0 0.6rem; font-size: var(--step-0); color: var(--text); }
+.cat-list {
+  list-style: none; margin: 0 0 0.6rem; padding: 0;
+  max-height: 14rem; overflow-y: auto; scrollbar-width: thin;
+  font-size: var(--step--1); color: var(--dim);
+}
+.cat-list li { padding: 0.2rem 0; border-top: 1px solid var(--line); }
+.cat-list li:first-child { border-top: 0; }
+.cat-list:empty { display: none; }
+.cat-result .set-btns { margin-top: 0.7rem; }
+
+/* The shortcuts: a key, then what it does */
+.set-keys { margin: 0.9rem 0 0; display: grid; gap: 0.1rem; }
+.set-keys > div {
+  display: grid; grid-template-columns: minmax(8rem, 12rem) 1fr; align-items: center; gap: 0.75rem;
+  padding: 0.4rem 0; border-top: 1px solid var(--line);
+}
+.set-keys > div:first-child { border-top: 0; }
+.set-keys dt { margin: 0; }
+.set-keys dd { margin: 0; color: var(--dim); font-size: var(--step--1); }
+.set-keys kbd {
+  display: inline-block; min-width: 1.9rem; padding: 0.1rem 0.5rem; text-align: center;
+  font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; font-size: var(--step--1);
+  color: var(--text); background: var(--bg-3);
+  border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 6px;
+}
+
 /* ---------- Narrow ---------- */
 @media (max-width: 640px) {
+  .set-keys > div { grid-template-columns: 1fr; gap: 0.2rem; }
   .set-row { grid-template-columns: 1fr; }
   .seg { grid-template-columns: 1fr; }
   .set-btns { flex-direction: row; flex-wrap: wrap; }

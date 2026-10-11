@@ -163,7 +163,99 @@
       </div>
     </section>
 
-    <section class="set-group" aria-labelledby="hArchive" style="--i: 4">
+    <section class="set-group" aria-labelledby="hIdle" style="--i: 4">
+      <div class="set-row">
+        <div class="set-group-head">
+          <span class="set-icon" aria-hidden="true"><svg><use href="#i-play"/></svg></span>
+          <div>
+            <h2 class="set-name" id="hIdle">Now playing screen</h2>
+            <p class="set-desc">While a song plays and nothing is touched for a while, the whole window shows the cover, the title and the lyrics. The expand button on the player bar opens it whenever you like, and Escape or the X puts it away.</p>
+          </div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="idle" checked>
+          <span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span>
+          <span class="switch-word" id="idleWord" data-on="On" data-off="Off">On</span>
+        </label>
+      </div>
+      <div class="set-check set-pick">
+        <label class="set-sub" for="idleSeconds">Comes up after</label>
+        <select class="select" id="idleSeconds">
+          <option value="15">15 seconds</option>
+          <option value="30" selected>30 seconds</option>
+          <option value="60">1 minute</option>
+          <option value="120">2 minutes</option>
+          <option value="300">5 minutes</option>
+        </select>
+      </div>
+    </section>
+
+    <section class="set-group" aria-labelledby="hFade" style="--i: 5">
+      <div class="set-row">
+        <div class="set-group-head">
+          <span class="set-icon" aria-hidden="true"><svg><use href="#i-signal"/></svg></span>
+          <div>
+            <h2 class="set-name" id="hFade">Crossfade</h2>
+            <p class="set-desc">Let the end of one song blend into the start of the next. It only applies when a song would go on to another one by itself: the next in a playlist, the next in the queue, or repeat all. Pressing Next, and the end of a lone Vault song, are not faded.</p>
+          </div>
+        </div>
+        <div class="set-pick">
+          <label class="sr-only" for="crossfade">Crossfade length</label>
+          <select class="select" id="crossfade">
+            <option value="0" selected>Off</option>
+            <option value="2">2 seconds</option>
+            <option value="4">4 seconds</option>
+            <option value="6">6 seconds</option>
+            <option value="8">8 seconds</option>
+            <option value="12">12 seconds</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class="set-group" aria-labelledby="hKeys" style="--i: 6">
+      <div class="set-group-head">
+        <span class="set-icon" aria-hidden="true"><svg><use href="#i-check"/></svg></span>
+        <div>
+          <h2 class="set-name" id="hKeys">Keyboard shortcuts</h2>
+          <p class="set-desc">They work on every page and on the now playing screen. They stand aside while you are typing in a box, moving a slider, or have a pop-up open.</p>
+        </div>
+      </div>
+      <dl class="set-keys">
+        <div><dt><kbd>Space</kbd></dt><dd>Play or pause</dd></div>
+        <div><dt><kbd>Left</kbd></dt><dd>Previous song</dd></div>
+        <div><dt><kbd>Right</kbd></dt><dd>Next song</dd></div>
+        <div><dt><kbd>Ctrl</kbd> <kbd>Left</kbd></dt><dd>Volume down</dd></div>
+        <div><dt><kbd>Ctrl</kbd> <kbd>Right</kbd></dt><dd>Volume up</dd></div>
+        <div><dt><kbd>Escape</kbd></dt><dd>Close the now playing screen or a panel</dd></div>
+      </dl>
+    </section>
+
+    <section class="set-group" aria-labelledby="hList" style="--i: 7">
+      <div class="set-row">
+        <div class="set-group-head">
+          <span class="set-icon" aria-hidden="true"><svg><use href="#i-cloud"/></svg></span>
+          <div>
+            <h2 class="set-name" id="hList">Song list</h2>
+            <p class="set-desc">The app keeps a saved copy of the archive's list of songs. Checking asks the archive what it has now, from the same place songs stream from, and shows what is new before anything changes. It sends nothing about you. Your saved songs and covers are never touched, and the old list is kept as a backup.</p>
+          </div>
+        </div>
+        <div class="set-btns">
+          <button class="btn btn-ghost" id="catCheck" type="button">Check for new songs</button>
+        </div>
+      </div>
+      <div class="cat-result" id="catResult" hidden>
+        <p class="cat-sum" id="catSum" role="status" aria-live="polite"></p>
+        <ul class="cat-list" id="catList"></ul>
+        <p class="set-note" id="catMore" hidden></p>
+        <div class="set-btns">
+          <button class="btn btn-primary" id="catApply" type="button">Update my list</button>
+          <button class="btn btn-ghost" id="catClose" type="button">Not now</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="set-group" aria-labelledby="hArchive" style="--i: 8">
       <div class="set-row">
         <div class="set-group-head">
           <span class="set-icon" aria-hidden="true"><svg><use href="#i-folder"/></svg></span>
