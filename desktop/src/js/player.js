@@ -1814,6 +1814,71 @@ export function removeFromQueue(qid) {
   return true;
 }
 
+/**
+ * Play a queued song now, from the Up next panel. The songs queued
+ * before it are skipped (they would have played first, and the person
+ * has chosen to go past them); the ones after it stay queued and follow.
+ * False if the entry has already gone.
+ */
+export function playQueued(qid) {
+  if (HOST) return HOST.playQueued(qid);
+  const at = state.queue.findIndex((entry) => entry.qid === qid);
+  if (at < 0) return false;
+  // Everything up to and including the pressed one leaves the queue;
+  // the pressed one is the last of those, and it is what plays
+  const gone = state.queue.splice(0, at + 1);
+  const entry = gone[gone.length - 1];
+  if (state.context === 'vault' && state.track) state.history.push(state.track);
+  state.fromQueue = true;
+  load(entry.track);
+  queueChanged();
+  return true;
+}
+
+/**
+ * Play one of the songs that follow on their own, from the Up next
+ * panel: `index` is its place in upNext().then.tracks. In a playlist the
+ * running order moves to that song, so the ones after it follow, and
+ * whatever is queued still plays after it. In the Vault it is the song
+ * that was named. With repeat one it starts this song again.
+ */
+export function playUpcoming(index) {
+  if (HOST) return HOST.playUpcoming(index);
+  if (!state.track || !Number.isInteger(index) || index < 0) return false;
+
+  if (state.repeat === 'one') {
+    audio.currentTime = 0;
+    audio.play().catch(() => paintPlaying(false));
+    return true;
+  }
+
+  if (state.context === 'playlist' && state.list.length && state.order.length) {
+    const n = state.order.length;
+    let at = state.cursor + index + 1;
+    if (at >= n) {
+      if (state.repeat !== 'all') return false;
+      at -= n;
+    }
+    if (at === state.cursor || at < 0 || at >= n) return false;
+    const track = state.list[state.order[at]];
+    if (!track) return false;
+    state.cursor = at;
+    state.fromQueue = false;
+    load(track);
+    return true;
+  }
+
+  if (state.context === 'vault' && index === 0 && state.peek) {
+    const pick = state.peek;
+    state.peek = null;
+    if (state.track) state.history.push(state.track);
+    state.fromQueue = false;
+    load(pick);
+    return true;
+  }
+  return false;
+}
+
 export function clearQueue() {
   if (HOST) { HOST.clearQueue(); return; }
   if (!state.queue.length) return;

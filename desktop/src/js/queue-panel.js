@@ -2,21 +2,26 @@
    The Up next panel.
 
    Opens from the bar's queue button and says what will play, in the
-   order it will play: what is playing now, then the songs that were
-   asked for (the queue, which can be taken out one at a time and
-   cleared), then the songs that follow on their own: the rest of the
-   playlist in its running order, or the one random song Next will pick
-   in the Vault.
+   order it will play, with the covers: what is playing now, then the
+   songs that were asked for (the queue), then the songs that follow on
+   their own: the rest of the playlist in its running order, or the one
+   random song Next will pick in the Vault.
 
-   The same song can be waiting more than once; each queue entry has
-   its own id, so Remove takes out the row that was pressed and no
-   other. The songs that follow on their own are read only: they are the
-   running order, and changing it is shuffle's and repeat's business.
+   Pressing a song plays it, and the ones after it follow:
+     a queued song     plays now; the queued songs before it are
+                       skipped and the ones after it stay queued
+     a playlist song   plays now and the running order carries on from
+                       it; whatever is queued still plays after it
+     the Vault pick    plays now
+   A queued song also has a cross, which takes only that one out. The
+   same song can be queued more than once; every queue entry has its
+   own id, so a cross takes out the row that was pressed and no other.
 
    shell.js only: the queue and the player live in the shell.
    ============================================================ */
 
 import { make } from './utils.js';
+import { buildCover } from './covers.js';
 import { makePopover } from './popover.js';
 
 /** Queue rows drawn. A queue can be a whole category; the player keeps
@@ -50,7 +55,7 @@ const THEN_LABEL = {
  * Start the panel.
  *
  *   player   the shell's player (onUpNext, onPlayback, removeFromQueue,
- *            clearQueue)
+ *            clearQueue, playQueued, playUpcoming)
  *   frame    the iframe the pages are shown in
  *
  * Returns { open, close, toggle, isOpen } for a harness.
@@ -59,19 +64,23 @@ export function initQueuePanel({ player, frame }) {
   const pop = makePopover({ id: 'queuePanel', title: 'Up next', frame });
   pop.el.classList.add('pop-queue');
 
+  /* ---- now playing ---- */
   const now = make('div', 'q-now');
+  const nowShot = make('span', 'q-shot q-shot-lg');
+  const nowText = make('div', 'q-now-text');
   const nowLabel = make('p', 'q-label', 'Now playing');
   const nowTitle = make('p', 'q-now-title', 'Nothing is playing');
   const nowMeta = make('p', 'q-meta');
-  now.append(nowLabel, nowTitle, nowMeta);
+  nowText.append(nowLabel, nowTitle, nowMeta);
+  now.append(nowShot, nowText);
 
-  // What was asked for
+  /* ---- what was asked for ---- */
   const queueLabel = make('p', 'q-label', 'Queued');
   const list = make('ol', 'q-list');
   const empty = make('p', 'q-empty',
     'Nothing is queued. Add songs from the Vault or a playlist, and the same song can go in more than once.');
 
-  // What follows on its own
+  /* ---- what follows on its own ---- */
   const thenWrap = make('div', 'q-then');
   const thenLabel = make('p', 'q-label', '');
   const thenList = make('ol', 'q-list q-up-list');
@@ -87,20 +96,43 @@ export function initQueuePanel({ player, frame }) {
 
   clear.addEventListener('click', () => player.clearQueue());
 
+  /** The track the big cover was last drawn for, so a pause or a
+      play does not redraw an image. */
+  let shownNow = null;
+
   function renderNow(snap) {
     const t = snap && snap.track;
     nowTitle.textContent = t ? t.t : 'Nothing is playing';
     nowMeta.textContent = t ? [t.c, snap.playing ? 'playing' : 'paused'].filter(Boolean).join('  ·  ') : '';
+    if (t !== shownNow) {
+      shownNow = t;
+      nowShot.textContent = '';
+      if (t) nowShot.appendChild(buildCover(t));
+    }
   }
 
-  function row(className, n, track) {
+  /** One song: its place, its cover, its title. A button, so a press
+      plays it and the keyboard can reach it. */
+  function row(className, n, track, onPlay) {
     const li = make('li', className);
-    li.appendChild(make('span', 'q-n mono', String(n).padStart(2, '0')));
+
+    const go = make('button', 'q-go');
+    go.type = 'button';
+    go.setAttribute('aria-label', `Play ${track.t}`);
+    go.appendChild(make('span', 'q-n mono', String(n).padStart(2, '0')));
+
+    const shot = make('span', 'q-shot');
+    shot.appendChild(buildCover(track));
+    go.appendChild(shot);
+
     const text = make('span', 'q-text');
     text.appendChild(make('span', 'q-title', track.t));
     const meta = [track.c, track.len].filter(Boolean).join('  ·  ');
     if (meta) text.appendChild(make('span', 'q-meta', meta));
-    li.appendChild(text);
+    go.appendChild(text);
+
+    go.addEventListener('click', onPlay);
+    li.appendChild(go);
     return li;
   }
 
@@ -112,7 +144,7 @@ export function initQueuePanel({ player, frame }) {
     list.textContent = '';
     const frag = document.createDocumentFragment();
     entries.slice(0, SHOWN).forEach((entry, i) => {
-      const li = row('q-row', i + 1, entry.track);
+      const li = row('q-row', i + 1, entry.track, () => player.playQueued(entry.qid));
       li.dataset.qid = String(entry.qid);
 
       const cut = make('button', 'q-cut');
@@ -138,7 +170,7 @@ export function initQueuePanel({ player, frame }) {
     thenList.textContent = '';
     const upFrag = document.createDocumentFragment();
     then.tracks.forEach((track, i) => {
-      const li = row('q-up', i + 1, track);
+      const li = row('q-up', i + 1, track, () => player.playUpcoming(i));
       li.dataset.kind = then.kind;
       upFrag.appendChild(li);
     });
