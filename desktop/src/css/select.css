@@ -1,0 +1,66 @@
+/* ============================================================
+   Select mode: pick several songs, add them to the queue together.
+   Used by the Vault and the playlists page; see js/select.js.
+   ============================================================ */
+
+.sel-toggle[aria-pressed="true"] {
+  border-color: var(--accent); background: rgba(139, 92, 246, 0.16); color: var(--text);
+}
+
+/* The bar that comes up while the mode is on. Fixed to the bottom of
+   the page in the frame, which already stops above the player. */
+.sel-bar {
+  position: fixed; left: 50%; bottom: 1rem; transform: translateX(-50%);
+  z-index: 30;
+  display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 0.5rem;
+  max-width: calc(100vw - 1.5rem);
+  padding: 0.55rem 0.7rem 0.55rem 1rem;
+  background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 999px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+}
+.sel-bar[hidden] { display: none; }
+.sel-count { min-width: 6.5rem; color: var(--accent-2); font-size: var(--step--1); }
+.sel-bar .btn { padding: 0.45rem 0.9rem; font-size: var(--step--1); }
+.sel-bar .btn:disabled { opacity: 0.45; cursor: default; }
+
+/* In the mode, rows and cards are things to pick, not to open */
+.is-selecting .cell,
+.is-selecting .pl-row { cursor: pointer; }
+.is-selecting .card-play,
+.is-selecting .card-add,
+.is-selecting .card-queue,
+.is-selecting .pl-go,
+.is-selecting .pl-acts { visibility: hidden; }
+
+.cell.is-picked .card-shot { outline: 3px solid var(--accent-2); outline-offset: -3px; border-radius: var(--r); }
+.pl-row.is-picked { background: rgba(139, 92, 246, 0.16); box-shadow: inset 3px 0 0 var(--accent); }
+
+/* The tick on a picked card, top left, over the artwork */
+.cell.is-picked::before {
+  content: ""; position: absolute; top: 0.55rem; left: 0.55rem; z-index: 3;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center / 14px no-repeat;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+/* A card's queue button, beside the add-to-playlist plus */
+.card-queue {
+  position: absolute; top: 0.45rem; right: 2.9rem; z-index: 5;
+  display: grid; place-items: center; width: 32px; height: 32px;
+  border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(8, 7, 12, 0.78); color: var(--text); cursor: pointer;
+  opacity: 0; pointer-events: none;
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  transition: opacity var(--dur) var(--ease), background-color var(--dur) var(--ease),
+              border-color var(--dur) var(--ease);
+}
+.cell:hover .card-queue,
+.card-queue:focus-visible { opacity: 1; pointer-events: auto; }
+.card-queue:hover { background: var(--accent); border-color: var(--accent); }
+.card-queue svg { width: 16px; height: 16px; }
+@media (hover: none) { .card-queue { opacity: 1; pointer-events: auto; } }
+
+/* "Add all to queue" and "Select songs" sit with the hero buttons */
+.pl-hero-acts .sel-toggle,
+.pl-hero-acts .pl-queue-all { white-space: nowrap; }

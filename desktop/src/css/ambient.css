@@ -137,6 +137,11 @@
 .amb-lyric.is-past { color: rgba(246, 244, 251, 0.5); }
 .amb-lyric.is-now { color: #fff; font-weight: 600; }
 
+/* Timed lines can be pressed to jump the song there */
+.amb-lines.is-seekable .amb-lyric { cursor: pointer; }
+.amb-lines.is-seekable .amb-lyric:hover { color: rgba(246, 244, 251, 0.9); }
+.amb-lines.is-seekable .amb-lyric.is-now:hover { color: #fff; }
+
 .amb-plain p {
   margin: 0 0 0.35rem;
   font-size: clamp(0.95rem, 1.3vw, 1.15rem); line-height: 1.5;

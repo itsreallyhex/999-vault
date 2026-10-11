@@ -1,0 +1,144 @@
+/* ============================================================
+   The panels over the bar: Up next, the sound lab, the sleep timer.
+   And the small marks the bar's own buttons get for them.
+
+   Anchored to the bottom right, just above the bar, wherever the bar
+   is: --bar-h is what shell.js measures. Built from the same tokens
+   as everything else (--bg-2 panels, --line-2 edges, --accent-2 for
+   what is on).
+   ============================================================ */
+
+/* ---------- The bar's buttons ---------- */
+.mini-count {
+  position: absolute; top: 3px; right: 1px;
+  min-width: 17px; height: 17px; padding: 0 4px;
+  display: grid; place-items: center;
+  border-radius: 999px; background: var(--accent); color: #fff;
+  font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+  font-size: 0.6rem; line-height: 1; letter-spacing: 0;
+  pointer-events: none;
+}
+.mini-count[hidden] { display: none; }
+.mini-btn.is-on { color: var(--accent-2); }
+.mini-btn.is-on .mini-count { background: var(--accent-2); color: #0B0910; }
+
+/* ---------- The panel ---------- */
+.pop {
+  position: fixed; z-index: 60;
+  right: 0.75rem;
+  bottom: calc(var(--bar-h, var(--mini-h, 84px)) + 0.6rem);
+  width: min(380px, calc(100vw - 1.5rem));
+  max-height: min(72vh, 640px);
+  display: flex; flex-direction: column;
+  background: var(--bg-2);
+  border: 1px solid var(--line-2); border-radius: var(--r);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  color: var(--text);
+}
+.pop[hidden] { display: none; }
+.pop-wide { width: min(480px, calc(100vw - 1.5rem)); }
+
+.pop-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+  padding: 0.75rem 0.9rem 0.6rem 1.1rem;
+  border-bottom: 1px solid var(--line);
+}
+.pop-title {
+  margin: 0; font-family: 'Righteous', 'Poppins', system-ui, sans-serif;
+  font-size: var(--step-1); font-weight: 400; letter-spacing: 0.01em;
+}
+.pop-close {
+  display: grid; place-items: center; width: 34px; height: 34px;
+  border: 0; border-radius: 50%; background: transparent; color: var(--dim); cursor: pointer;
+  transition: color var(--dur) var(--ease), background-color var(--dur) var(--ease);
+}
+.pop-close:hover { color: var(--text); background: rgba(255, 255, 255, 0.07); }
+.pop-close svg { width: 16px; height: 16px; }
+
+.pop-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0.9rem 1.1rem; scrollbar-width: thin; }
+.pop-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap;
+  padding: 0.65rem 1.1rem 0.8rem;
+  border-top: 1px solid var(--line);
+  font-size: var(--step--1); color: var(--dim);
+}
+
+/* ---------- Up next ---------- */
+.q-label {
+  margin: 0 0 0.35rem;
+  font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+  font-size: var(--step--2); letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint);
+}
+.q-now { margin-bottom: 1rem; }
+.q-now-title { margin: 0; font-size: var(--step-0); font-weight: 600; overflow-wrap: anywhere; }
+.q-meta { margin: 0.1rem 0 0; font-size: var(--step--1); color: var(--dim); }
+
+.q-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.1rem; }
+.q-row {
+  display: grid; grid-template-columns: 2.2rem minmax(0, 1fr) auto; align-items: center; gap: 0.5rem;
+  padding: 0.35rem 0.25rem; border-radius: 10px;
+}
+.q-row:hover { background: rgba(255, 255, 255, 0.04); }
+.q-n { color: var(--faint); font-size: var(--step--1); text-align: right; }
+.q-text { display: grid; min-width: 0; }
+.q-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--step-0); }
+.q-cut {
+  display: grid; place-items: center; width: 32px; height: 32px;
+  border: 0; border-radius: 50%; background: transparent; color: var(--faint); cursor: pointer;
+  transition: color var(--dur) var(--ease), background-color var(--dur) var(--ease);
+}
+.q-cut:hover { color: var(--c-cut); background: rgba(251, 113, 133, 0.12); }
+.q-cut svg { width: 15px; height: 15px; }
+.q-more { padding: 0.4rem 0.5rem; color: var(--faint); font-size: var(--step--1); }
+.q-empty { margin: 0; color: var(--dim); font-size: var(--step--1); line-height: 1.5; }
+.q-count { color: var(--dim); }
+.q-list[hidden], .q-empty[hidden], .q-label[hidden], .q-clear[hidden] { display: none; }
+
+/* ---------- Sound lab ---------- */
+.lab-note { margin: 0 0 0.8rem; font-size: var(--step--1); color: var(--dim); line-height: 1.45; }
+.lab-note[data-state="warn"] { color: var(--c-stem); }
+
+.lab-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 1rem; }
+.lab-rooms { margin: 0.2rem 0 1rem; }
+.lab-chip {
+  padding: 0.3rem 0.75rem; border-radius: 999px;
+  border: 1px solid var(--line-2); background: transparent; color: var(--dim);
+  font: inherit; font-size: var(--step--1); cursor: pointer;
+  transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.lab-chip:hover:not(:disabled) { color: var(--text); border-color: var(--accent-2); }
+.lab-chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.lab-chip:disabled { opacity: 0.45; cursor: default; }
+
+.lab-row { margin: 0 0 0.9rem; }
+.lab-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.2rem; }
+.lab-name { font-size: var(--step--1); color: var(--text); }
+.lab-val { font-size: var(--step--1); color: var(--accent-2); }
+.lab-range { width: 100%; }
+.lab-check {
+  display: flex; gap: 0.55rem; align-items: flex-start; margin: 0 0 1rem;
+  font-size: var(--step--1); color: var(--dim); line-height: 1.4; cursor: pointer;
+}
+.lab-check input { margin-top: 0.15rem; accent-color: var(--accent); }
+.pop-foot .lab-check { margin: 0; align-items: center; }
+
+.lab-sub {
+  margin: 0.4rem 0 0.6rem;
+  font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+  font-size: var(--step--2); letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint);
+}
+.lab-eq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.2rem 1.1rem; }
+.lab-band { margin: 0 0 0.45rem; }
+.lab-fade { flex-basis: 100%; margin: 0; font-size: var(--step--2); color: var(--faint); }
+
+/* ---------- Sleep timer ---------- */
+.sleep-state { margin: 0 0 0.8rem; font-size: var(--step-0); color: var(--accent-2); }
+.sleep-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.sleep-opt { justify-content: center; }
+.sleep-hint { flex: 1 1 12rem; font-size: var(--step--2); line-height: 1.4; }
+.sleep-off[hidden] { display: none; }
+
+@media (max-width: 480px) {
+  .pop, .pop-wide { right: 0.5rem; width: calc(100vw - 1rem); }
+  .lab-eq-grid { grid-template-columns: 1fr; }
+}

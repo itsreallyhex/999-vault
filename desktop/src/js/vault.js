@@ -19,8 +19,9 @@ import {
 } from './lightbox.js';
 import { openPicker, isPickerOpen } from './picker.js';
 import {
-  initPlayer, playTrack, setVaultPool, toggle, onPlayback, sameTrack
+  initPlayer, playTrack, setVaultPool, toggle, onPlayback, sameTrack, enqueueMany
 } from './player.js';
+import { createSelect } from './select.js';
 import { SEED } from './seed.js';
 
 /* ---------- State ---------- */
@@ -89,14 +90,77 @@ function playCard(track) {
   else playTrack(track);
 }
 
+/** One line of feedback. The shell draws it over the bar; a bare page
+    has nowhere better and stays quiet. */
+function say(text) {
+  try {
+    const up = window.parent !== window && window.parent.__nine_toast;
+    if (up) up(text);
+  } catch { /* not ours */ }
+}
+
+/** The card's queue button: this song, after whatever is waiting.
+    Pressing it again queues it again, which is the point. */
+function queueCard(track) {
+  const waiting = enqueueMany([track]);
+  say(waiting ? `${track.t} added to the queue (${waiting} waiting)` : `Playing ${track.t}`);
+}
+
+/* ---------- Select mode ----------
+   Pick several cards and add them together. In the mode a press on a
+   card picks it instead of opening it. Picks are kept by record id, so
+   a redraw (a filter, "load more") does not lose them. */
+
+const pickKey = (t) => t.rid || `t:${t.t}`;
+
+const select = createSelect({
+  parent: el.sortSelect.parentElement,
+  scope: document.body,
+  keyOf: pickKey,
+  // Queue order is the order on screen
+  ordered: () => visible(),
+  every: () => visible(),
+  onQueue: (list) => enqueueMany(list),
+  say
+});
+
+function trackOf(cell) {
+  const rid = cell.dataset.rid;
+  if (rid) return data.find((t) => t.rid === rid) || null;
+  const title = cell.querySelector('.card-title');
+  return title ? data.find((t) => t.t === title.textContent) || null : null;
+}
+
+function markPicked() {
+  Array.from(el.rows.children).forEach((cell) => {
+    const track = trackOf(cell);
+    cell.classList.toggle('is-picked', Boolean(track) && select.has(track));
+  });
+}
+
+// Capture, so the card's own handlers (open, double click to play) never
+// see a press that belongs to the selection
+el.rows.addEventListener('click', (event) => {
+  if (!select.active()) return;
+  const cell = event.target.closest ? event.target.closest('.cell') : null;
+  if (!cell) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const track = trackOf(cell);
+  if (track) select.toggle(track);
+}, true);
+
+select.onChange(markPicked);
+
 /* ---------- Draw ---------- */
 function draw(reset) {
   if (reset) shown = PAGE_SIZE;
   const list = visible();
-  renderGrid(list, shown, openLightbox, openPicker, playCard);
+  renderGrid(list, shown, openLightbox, openPicker, playCard, queueCard);
   renderCount(list, state);
   // Fresh cards carry no mark, so it goes back on here
   markPlaying();
+  markPicked();
 }
 
 function loadMore() {

@@ -38,6 +38,9 @@ import { buildCover, coverSpec } from './covers.js';
 import { swatchFor } from './ui.js';
 import { pushRecent, recentIds, itemsIn, logPlay, addListened } from './db.js';
 import { openPicker } from './picker.js';
+import {
+  createFx, clean as cleanLab, neutral as neutralLab, isNeutral, needsGraph, recall, remember, forget
+} from './fx.js';
 
 /* The audio index and the audio folder used to be URLs resolved against
    this module, which worked because a server was serving them. There is
@@ -251,14 +254,39 @@ const prefs = {
   /** 'local': the file if there is one, else the stream. 'stream':
       the archive, and the file only if the archive fails. */
   source: 'local',
-  discord: true
+  discord: true,
+  /** The idle screen: whether it may come up by itself, and after how
+      many seconds with no input. ambient.js reads these through
+      onSettings(); the player only carries them. */
+  idle: true,
+  idleSeconds: 30,
+  /** Seconds of overlap between one song and the next. 0 is off. */
+  crossfade: 0
 };
+
+/** Told when a setting changes, with the whole block. */
+const settingsListeners = new Set();
 
 function loadSettings() {
   if (!inTauri) return Promise.resolve();
   return invoke('settings_get')
-    .then((s) => applySettings({ source: s.source, discord: s.discord }))
+    .then((s) => applySettings({
+      source: s.source,
+      discord: s.discord,
+      idle: s.idle,
+      idleSeconds: s.idle_seconds,
+      crossfade: s.crossfade
+    }))
     .catch(() => { /* not under Tauri, or no config: defaults stand */ });
+}
+
+/** Be told when a setting changes, and once straight away. Returns the
+    unsubscribe. */
+export function onSettings(fn) {
+  if (HOST) return HOST.onSettings(fn);
+  settingsListeners.add(fn);
+  try { fn({ ...prefs }); } catch { /* a listener must not break the player */ }
+  return () => settingsListeners.delete(fn);
 }
 
 /** Take new values. Source applies from the next load; Discord off
@@ -266,6 +294,14 @@ function loadSettings() {
 export function applySettings(next = {}) {
   if (HOST) { HOST.applySettings(next); return; }
   if (next.source === 'local' || next.source === 'stream') prefs.source = next.source;
+  if (typeof next.idle === 'boolean') prefs.idle = next.idle;
+  if (Number.isFinite(next.idleSeconds) && next.idleSeconds >= 5) prefs.idleSeconds = Math.round(next.idleSeconds);
+  if (Number.isFinite(next.crossfade) && next.crossfade >= 0) {
+    prefs.crossfade = Math.min(12, Math.round(next.crossfade));
+  }
+  settingsListeners.forEach((fn) => {
+    try { fn({ ...prefs }); } catch { /* as above */ }
+  });
   if (typeof next.discord === 'boolean') {
     const was = prefs.discord;
     prefs.discord = next.discord;
@@ -302,8 +338,10 @@ const state = {
   /** Vault context only: tracks already played, newest last. */
   history: [],
   /** Tracks asked for next, in order, ahead of whatever the context
-      would pick. Served by next() and by a track ending; the context
-      and its cursor are left alone so the running order carries on
+      would pick, each as { qid, track }. The id is what lets the same
+      song sit in the queue twice and still be taken out one at a
+      time. Served by next() and by a track ending; the context and
+      its cursor are left alone so the running order carries on
       afterwards. Session state, like shuffle: not in the resume. */
   queue: [],
   /** True while the loaded track came out of the queue rather than the
@@ -385,17 +423,30 @@ function logStart() {
 
 /* ---------- Audio element ---------- */
 
-const audio = new Audio();
+/* Two elements, one of them idle. `audio` is always the one the bar
+   speaks for; `spare` waits. They only trade places for a crossfade:
+   the next song starts on the idle one while the old one fades, and
+   then the roles are simply the other way round. Everything below
+   reads `audio`, so every handler works unchanged on whichever it is;
+   the handlers that are bound to both ignore an event that is not
+   from the live one. */
+let audio = new Audio();
 audio.preload = 'metadata';
+let spare = null;
+
+/** The volume the person chose, 0 to 1. A fade moves each element's own
+    volume around it, so the chosen level is kept here. */
+let level = 0.8;
 
 /** Read the saved volume before the first track, so the first play is
     not full blast. A private window can refuse storage outright. */
 try {
   const saved = parseFloat(localStorage.getItem(VOL_KEY));
-  audio.volume = Number.isFinite(saved) ? Math.min(1, Math.max(0, saved)) : 0.8;
+  level = Number.isFinite(saved) ? Math.min(1, Math.max(0, saved)) : 0.8;
 } catch {
-  audio.volume = 0.8;
+  level = 0.8;
 }
+audio.volume = level;
 
 /* ---------- Watchers ----------
    The pages draw their own "now playing" mark on the row or card that
@@ -508,10 +559,13 @@ function presenceShown() {
 
   shown.line = state.repeat === 'one' ? 'Juice WRLD · On repeat' : 'Juice WRLD';
 
+  // Wall-clock time, so a song at 0.85x takes longer than its length
+  // and Discord's bar still ends when the sound does
+  const rate = audio.playbackRate > 0 ? audio.playbackRate : 1;
   const pos = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
-  shown.start = now - Math.floor(pos);
+  shown.start = now - Math.floor(pos / rate);
   if (Number.isFinite(audio.duration) && audio.duration > 0) {
-    shown.end = shown.start + Math.round(audio.duration);
+    shown.end = shown.start + Math.round(audio.duration / rate);
   }
   return shown;
 }
@@ -586,6 +640,12 @@ const SAVE = ['M12 4v11', 'M7 10l5 5 5-5', 'M4 19h16'];
 const PLUS = ['M12 5v14', 'M5 12h14'];
 /** Four corner brackets: open the full-window now playing screen. */
 const EXPAND = ['M4 9V4h5', 'M20 9V4h-5', 'M4 15v5h5', 'M20 15v5h-5'];
+/** Three lines and a play mark: the queue. */
+const LIST = ['M4 6h12', 'M4 12h12', 'M4 18h7', 'M17 14l4 3-4 3z'];
+/** Three sliders: the sound lab. */
+const SLIDERS = ['M4 21v-7', 'M4 10V3', 'M12 21v-9', 'M12 8V3', 'M20 21v-5', 'M20 12V3', 'M1 14h6', 'M9 8h6', 'M17 16h6'];
+/** A crescent: the sleep timer. */
+const MOON = 'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z';
 
 /** An icon-only button, labelled for anyone not looking at it. */
 function control(cls, label, svg) {
@@ -719,6 +779,27 @@ function mount() {
   ui.screen.hidden = true;
   side.appendChild(ui.screen);
 
+  // Three that open a panel over the bar. The player only raises an
+  // event naming the button; the shell owns the panels, the same split
+  // the artwork and the screen button use.
+  ui.queueBtn = control('mini-btn mini-queue', 'Up next', icon(...LIST));
+  ui.queueBtn.title = 'Up next';
+  ui.queueN = make('span', 'mini-count', '0');
+  ui.queueN.hidden = true;
+  ui.queueBtn.appendChild(ui.queueN);
+  side.appendChild(ui.queueBtn);
+
+  ui.lab = control('mini-btn mini-lab', 'Sound lab', icon(...SLIDERS));
+  ui.lab.title = 'Sound lab';
+  side.appendChild(ui.lab);
+
+  ui.sleep = control('mini-btn mini-sleep', 'Sleep timer', icon(MOON));
+  ui.sleep.title = 'Sleep timer';
+  ui.sleepN = make('span', 'mini-count', '');
+  ui.sleepN.hidden = true;
+  ui.sleep.appendChild(ui.sleepN);
+  side.appendChild(ui.sleep);
+
   ui.mute = control('mini-btn mini-vol-btn', 'Mute', icon(...VOL));
   side.appendChild(ui.mute);
 
@@ -727,7 +808,7 @@ function mount() {
   ui.volume.min = '0';
   ui.volume.max = '100';
   ui.volume.step = '1';
-  ui.volume.value = String(Math.round(audio.volume * 100));
+  ui.volume.value = String(Math.round(level * 100));
   ui.volume.setAttribute('aria-label', 'Volume');
   side.appendChild(ui.volume);
 
@@ -763,7 +844,8 @@ function fill(input) {
 }
 
 function paintVolume() {
-  const muted = audio.muted || audio.volume === 0;
+  // `level`, not the element: mid-fade the element's own volume moves
+  const muted = audio.muted || level === 0;
   ui.mute.textContent = '';
   ui.mute.appendChild(icon(...(muted ? MUTE : VOL)));
   ui.mute.setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
@@ -1065,7 +1147,444 @@ function randomTrack() {
   return pick[Math.floor(Math.random() * pick.length)];
 }
 
+/* ---------- The sound lab ----------
+   Speed and pitch are the element's own playbackRate and
+   preservesPitch: always there, no CORS, nothing to build. Reverb, EQ
+   and bass go through a Web Audio graph (fx.js), which is only built
+   the first time a song needs it, and only after a one-byte probe
+   shows the audio can be read. A media element routed through Web
+   Audio plays silence for audio it may not read, and says nothing,
+   so the probe is the guard against that. If it fails the lab keeps
+   working for speed and says why the rest is off. */
+
+const lab = {
+  settings: neutralLab(),
+  /** Where the settings in force came from: 'song', 'all' or 'none'.
+      Edits are saved back to the same place. */
+  scope: 'none',
+  fx: createFx(),
+  /** Both elements load in CORS mode and play through the graph. One
+      way: an element cannot be taken back out of Web Audio. */
+  engaged: false,
+  /** Why reverb and EQ cannot run, for the panel, or ''. */
+  blocked: '',
+  pending: null
+};
+
+const labListeners = new Set();
+/** origin -> whether a CORS read of it worked, so one probe each. */
+const corsSeen = new Map();
+
+function labKey(track) {
+  if (!track) return null;
+  return track.rid || (track.t ? `t:${normalise(track.t)}` : null);
+}
+
+/** Speed, and whether the pitch goes with it, on one element. The
+    default rate is set too: loading a new file resets playbackRate to
+    it. */
+function applyRate(el, s) {
+  if (!el) return;
+  try {
+    el.defaultPlaybackRate = s.rate;
+    el.playbackRate = s.rate;
+    const keep = !s.linked;
+    el.preservesPitch = keep;
+    el.mozPreservesPitch = keep;
+    el.webkitPreservesPitch = keep;
+  } catch { /* an engine without these: the song plays as recorded */ }
+}
+
+/** Whether a response can be read cross-origin: a one-byte ranged GET
+    in CORS mode, which is exactly what the element will send. */
+async function corsReadable(url) {
+  if (!url || typeof fetch !== 'function') return false;
+  let origin = '';
+  try { origin = new URL(url, window.location.href).origin; } catch { return false; }
+  if (corsSeen.has(origin)) return corsSeen.get(origin);
+
+  let ok = false;
+  try {
+    const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    const res = await fetch(url, {
+      mode: 'cors',
+      headers: { Range: 'bytes=0-0' },
+      signal: ctl ? ctl.signal : undefined
+    });
+    ok = Boolean(res && res.ok);
+    if (ctl) ctl.abort();
+  } catch {
+    ok = false;
+  }
+  // Only a yes is remembered. A no may be a dropped connection, and
+  // a session should not lose the effects for good because of one.
+  if (ok) corsSeen.set(origin, true);
+  return ok;
+}
+
+/** Build the graph and put both elements in CORS mode. False, with a
+    reason in lab.blocked, when it cannot be done. */
+async function engageFx(url) {
+  if (lab.engaged) return true;
+  if (!lab.fx.supported) {
+    lab.blocked = 'This build of the app has no Web Audio, so reverb and the equalizer are off. Speed and pitch still work.';
+    return false;
+  }
+  if (!(await corsReadable(url))) {
+    lab.blocked = 'The app is not allowed to process this audio, so reverb and the equalizer are off. Speed and pitch still work.';
+    return false;
+  }
+  if (!lab.fx.ensure()) {
+    lab.blocked = 'Web Audio would not start, so reverb and the equalizer are off. Speed and pitch still work.';
+    return false;
+  }
+  audio.crossOrigin = 'anonymous';
+  if (spare) spare.crossOrigin = 'anonymous';
+  lab.engaged = true;
+  lab.blocked = '';
+  return true;
+}
+
+/** Engage while a song is already playing: reload the same file in
+    CORS mode at the same place, and route it. */
+async function engageNow() {
+  const el = audio;
+  const url = el.currentSrc || el.getAttribute('src');
+  if (!url) return false;
+  if (!(await engageFx(url))) return false;
+  if (el !== audio) return true; // a crossfade swapped it meanwhile; the next load routes it
+
+  const at = el.currentTime || 0;
+  const was = !el.paused;
+  el.src = url;
+  el.addEventListener('loadedmetadata', () => {
+    try { el.currentTime = at; } catch { /* not seekable yet */ }
+  }, { once: true });
+  lab.fx.attach(el);
+  applyRate(el, lab.settings);
+  if (was) el.play().catch(() => paintPlaying(false));
+  return true;
+}
+
+function labSnapshot() {
+  return {
+    settings: cleanLab(lab.settings),
+    scope: lab.scope,
+    engaged: lab.engaged,
+    supported: lab.fx.supported,
+    blocked: lab.blocked,
+    track: state.track
+  };
+}
+
+function labChanged() {
+  paintLabButton();
+  const snap = labSnapshot();
+  labListeners.forEach((fn) => {
+    try { fn(snap); } catch { /* a panel must not take the player down */ }
+  });
+}
+
+function paintLabButton() {
+  if (!ui.lab) return;
+  const on = !isNeutral(lab.settings);
+  ui.lab.classList.toggle('is-on', on);
+  ui.lab.setAttribute('aria-label', on ? 'Sound lab, effects on' : 'Sound lab');
+}
+
+/** The lab as it stands, a copy. */
+export function labState() {
+  if (HOST) return HOST.labState();
+  return labSnapshot();
+}
+
+export function onLab(fn) {
+  if (HOST) {
+    const off = HOST.onLab(fn);
+    window.addEventListener('pagehide', off, { once: true });
+    return off;
+  }
+  labListeners.add(fn);
+  fn(labSnapshot());
+  return () => labListeners.delete(fn);
+}
+
+/** Save the settings where they came from: this song's own entry, or
+    the one for every song. */
+function persistLab() {
+  if (lab.scope === 'all') {
+    remember(null, 'all', lab.settings);
+  } else {
+    remember(labKey(state.track), 'song', lab.settings);
+    lab.scope = isNeutral(lab.settings) ? 'none' : 'song';
+  }
+}
+
+/**
+ * Change some of the settings, apply them now and keep them. Speed and
+ * pitch land at once; the first reverb, EQ or bass reloads the song in
+ * place, once, to route it through Web Audio.
+ */
+export async function setLab(patch = {}) {
+  if (HOST) return HOST.setLab(patch);
+  lab.settings = cleanLab({ ...lab.settings, ...patch });
+  applyRate(audio, lab.settings);
+  applyRate(spare, lab.settings);
+  persistLab();
+
+  if (needsGraph(lab.settings) && !lab.engaged && state.track) {
+    if (!lab.pending) {
+      lab.pending = engageNow().finally(() => { lab.pending = null; });
+    }
+    await lab.pending;
+  }
+  if (lab.engaged) {
+    lab.fx.apply(lab.settings);
+    lab.fx.resume();
+  }
+  presenceSync();
+  labChanged();
+  return labSnapshot();
+}
+
+/** Back to the recording, for this song (or for every song, when
+    that is where the settings live). */
+export function resetLab() {
+  if (HOST) return HOST.resetLab();
+  return setLab(neutralLab());
+}
+
+/** Make the current settings the ones for every song ('all'), or this
+    song's alone ('song'). */
+export function setLabScope(scope) {
+  if (HOST) return HOST.setLabScope(scope);
+  const key = labKey(state.track);
+  if (scope === 'all') {
+    remember(null, 'all', lab.settings);
+    forget(key);
+    lab.scope = 'all';
+  } else {
+    remember(null, 'all', neutralLab());
+    remember(key, 'song', lab.settings);
+    lab.scope = isNeutral(lab.settings) ? 'none' : 'song';
+  }
+  labChanged();
+  return labSnapshot();
+}
+
+/** A song is about to load: what does the lab say for it? Applied to
+    the element by load() itself. */
+function labFor(track) {
+  const r = recall(labKey(track));
+  lab.settings = r.settings;
+  lab.scope = r.scope;
+}
+
+/* ---------- Crossfade ----------
+   The next song starts on the idle element while the old one fades
+   out under it, then the two simply trade jobs. The fade runs on the
+   elements' own volume, so it needs no Web Audio and works through the
+   graph or without it. It is started from the end of a song by a
+   timeupdate, and only when the song ending would have carried on to
+   another one: a lone Vault track, the end of a playlist, repeat-one
+   and the sleep timer's "end of this song" all end the way they
+   always did. A press of Next is not a crossfade. */
+
+/** Set by startCrossfade() and read, synchronously, by the load() that
+    next() calls. */
+let wantFade = false;
+/** { out, started, t0, len, timer } while a fade is under way. */
+let fade = null;
+
+function ensureSpare() {
+  if (!spare) {
+    spare = new Audio();
+    spare.preload = 'metadata';
+    if (lab.engaged) spare.crossOrigin = 'anonymous';
+    bindElement(spare);
+  }
+  spare.muted = audio.muted;
+  spare.volume = level;
+  applyRate(spare, lab.settings);
+  return spare;
+}
+
+/** The idle element becomes the live one, silent, and the old one is
+    left playing in the background until the fade ends. */
+function swapForFade() {
+  const out = audio;
+  const incoming = ensureSpare();
+  audio = incoming;
+  spare = out;
+  audio.volume = 0;
+  fade = { out, started: false, t0: 0, len: 0, timer: null };
+}
+
+/** Called when the incoming song is actually making sound, so the
+    overlap is measured from there and not from the request. */
+function rampStart() {
+  const f = fade;
+  if (!f || f.started) return;
+  f.started = true;
+
+  const left = Number.isFinite(f.out.duration) ? f.out.duration - f.out.currentTime : 0;
+  const wanted = Math.max(1, prefs.crossfade);
+  f.len = Math.max(0.4, left > 0 ? Math.min(wanted, left) : wanted) * 1000;
+  f.t0 = Date.now();
+  f.timer = setInterval(() => {
+    const p = Math.min(1, (Date.now() - f.t0) / f.len);
+    // Equal power: the sum of the two stays level through the middle
+    audio.volume = level * Math.sin(p * Math.PI / 2);
+    f.out.volume = level * Math.cos(p * Math.PI / 2);
+    if (p >= 1) finishFade();
+  }, 50);
+}
+
+/** Cut the outgoing element and put the volumes back. Safe to call
+    with no fade, and from anywhere the old song must stop at once. */
+function finishFade() {
+  if (!fade) return;
+  const f = fade;
+  fade = null;
+  clearInterval(f.timer);
+  try {
+    f.out.pause();
+    f.out.removeAttribute('src');
+    f.out.load();
+  } catch { /* already gone */ }
+  f.out.volume = level;
+  audio.volume = level;
+}
+
+/** Whether the song now ending should hand over by fading. */
+function crossfadeWanted() {
+  if (!prefs.crossfade || fade || !state.track || audio.paused) return false;
+  if (sleep.mode === 'song' || state.repeat === 'one') return false;
+
+  const dur = audio.duration;
+  if (!Number.isFinite(dur) || dur <= 0) return false;
+  // Not for a song shorter than two overlaps: there is nothing to fade
+  if (dur < prefs.crossfade * 2) return false;
+  const left = dur - audio.currentTime;
+  if (left > prefs.crossfade + 0.4 || left <= 0.15) return false;
+
+  // Would the song ending have gone on to another one?
+  if (state.queue.length) return true;
+  if (state.context === 'playlist') {
+    if (!state.list.length) return false;
+    return state.cursor + 1 < state.order.length || state.repeat === 'all';
+  }
+  return state.repeat === 'all';
+}
+
+function maybeCrossfade() {
+  if (!crossfadeWanted()) return;
+  wantFade = true;
+  try {
+    next({ auto: true });
+  } finally {
+    wantFade = false;
+  }
+}
+
+/* ---------- The sleep timer ----------
+   Pauses the music after a set time, or at the end of the song that
+   is playing. Off until one is chosen, and gone when the app closes. */
+
+const sleep = { mode: null, until: 0, timer: null, tick: null };
+const sleepListeners = new Set();
+
+function sleepSnapshot() {
+  const left = sleep.mode === 'timer' ? Math.max(0, Math.round((sleep.until - Date.now()) / 1000)) : 0;
+  return { mode: sleep.mode, until: sleep.until, left };
+}
+
+function clearSleepTimers() {
+  clearTimeout(sleep.timer);
+  clearInterval(sleep.tick);
+  sleep.timer = null;
+  sleep.tick = null;
+}
+
+function sleepChanged() {
+  if (ui.sleep) {
+    const snap = sleepSnapshot();
+    ui.sleep.classList.toggle('is-on', Boolean(snap.mode));
+    ui.sleepN.hidden = !snap.mode;
+    ui.sleepN.textContent = snap.mode === 'song' ? 'end' : `${Math.max(1, Math.ceil(snap.left / 60))}m`;
+    ui.sleep.setAttribute('aria-label', snap.mode ? 'Sleep timer is set' : 'Sleep timer');
+  }
+  const snap = sleepSnapshot();
+  sleepListeners.forEach((fn) => {
+    try { fn(snap); } catch { /* as above */ }
+  });
+}
+
+function sleepFire() {
+  clearSleepTimers();
+  sleep.mode = null;
+  sleep.until = 0;
+  finishFade();
+  if (state.track && !audio.paused) audio.pause();
+  note('Sleep timer: paused');
+  sleepChanged();
+}
+
+/** Start the timer: a number of minutes, or 'song' for the end of the
+    one that is playing. Replaces any timer already set. */
+export function startSleep(how) {
+  if (HOST) { HOST.startSleep(how); return; }
+  clearSleepTimers();
+  sleep.mode = null;
+  sleep.until = 0;
+
+  if (how === 'song') {
+    sleep.mode = 'song';
+  } else {
+    const minutes = Number(how);
+    if (Number.isFinite(minutes) && minutes > 0) {
+      sleep.mode = 'timer';
+      sleep.until = Date.now() + minutes * 60000;
+      sleep.timer = setTimeout(sleepFire, minutes * 60000);
+      // A laptop that slept holds a setTimeout back; the clock does not
+      sleep.tick = setInterval(() => {
+        if (Date.now() >= sleep.until) sleepFire();
+        else sleepChanged();
+      }, 1000);
+    }
+  }
+  sleepChanged();
+}
+
+export function cancelSleep() {
+  if (HOST) { HOST.cancelSleep(); return; }
+  clearSleepTimers();
+  sleep.mode = null;
+  sleep.until = 0;
+  sleepChanged();
+}
+
+export function sleepState() {
+  if (HOST) return HOST.sleepState();
+  return sleepSnapshot();
+}
+
+export function onSleep(fn) {
+  if (HOST) {
+    const off = HOST.onSleep(fn);
+    window.addEventListener('pagehide', off, { once: true });
+    return off;
+  }
+  sleepListeners.add(fn);
+  fn(sleepSnapshot());
+  return () => sleepListeners.delete(fn);
+}
+
 /* ---------- Loading ---------- */
+
+/** Which load() is the newest. A load that finds it has been
+    overtaken after an await lets go instead of overwriting it. */
+let loadSeq = 0;
 
 /**
  * Point the element at a track and, unless told otherwise, play it.
@@ -1074,7 +1593,14 @@ function randomTrack() {
  * on screen rather than throwing inside a click handler.
  */
 async function load(track, { autoplay = true, at = 0, resumeId = null } = {}) {
+  // Read before the first await: startCrossfade() raises it and next()
+  // calls straight in here, so this is the one place it can be seen.
+  const fadeIn = wantFade;
+  wantFade = false;
+  const mine = ++loadSeq;
+
   await loadIndex();
+  if (mine !== loadSeq) return false;
   clearApiTimer();
 
   // Close the book on whatever was playing before the switch. A track
@@ -1082,6 +1608,16 @@ async function load(track, { autoplay = true, at = 0, resumeId = null } = {}) {
   // navigation mid-track is one play, not two.
   tick();
   flushListened();
+
+  // A crossfade moves the song that is ending to the other element and
+  // lets it run out under this one. Any other load cuts a fade short:
+  // a person who picked something else wants that, now.
+  if (fadeIn && audio.getAttribute('src') && !audio.paused) {
+    swapForFade();
+  } else {
+    finishFade();
+    audio.volume = level;
+  }
   playId = resumeId || null;
   logging = false;
   lastPos = at > 0 ? at : 0;
@@ -1098,6 +1634,9 @@ async function load(track, { autoplay = true, at = 0, resumeId = null } = {}) {
   state.track = track;
   wantPlay = autoplay;
 
+  // What the lab remembers for this song, or for every song
+  labFor(track);
+
   mount();
   ui.bar.hidden = false;
   document.body.classList.add('has-player');
@@ -1107,8 +1646,11 @@ async function load(track, { autoplay = true, at = 0, resumeId = null } = {}) {
   // The track has changed even though nothing is playing yet: the
   // pages move their mark now and the play event lights it up.
   notify();
+  labChanged();
 
   if (!src) {
+    // Nothing to hand over to: the song that was fading out stops here
+    finishFade();
     audio.pause();
     audio.removeAttribute('src');
     ui.bar.classList.add('is-missing');
@@ -1123,7 +1665,22 @@ async function load(track, { autoplay = true, at = 0, resumeId = null } = {}) {
   ui.range.disabled = false;
   ui.range.value = '0';
   fill(ui.range);
+
+  // Reverb, EQ or bass remembered for this song: build the graph
+  // before the file is requested, so the request is made in CORS mode
+  // and the song does not have to be loaded twice.
+  if (needsGraph(lab.settings) && !lab.engaged) {
+    await engageFx(src);
+    if (mine !== loadSeq) return false;
+  }
+
   audio.src = src;
+  applyRate(audio, lab.settings);
+  if (lab.engaged) {
+    lab.fx.attach(audio);
+    lab.fx.apply(lab.settings);
+    lab.fx.resume();
+  }
 
   if (state.source === 'api') {
     // A 404 or a dead network fires `error` and is handled there. This
@@ -1192,36 +1749,117 @@ export function playTrack(track) {
  */
 export function enqueue(track) {
   if (HOST) return HOST.enqueue(track);
-  if (!track) return state.queue.length;
+  return enqueueMany(track ? [track] : []);
+}
+
+/**
+ * Put several tracks in line at once, in the order given, after
+ * whatever is already waiting. The same song can be in the queue more
+ * than once, and can be asked for again while it is the one playing:
+ * a queue is a list of requests, not a set of songs.
+ *
+ * With nothing loaded the first one plays and the rest wait behind it.
+ * Returns how many are waiting afterwards.
+ */
+export function enqueueMany(tracks) {
+  if (HOST) return HOST.enqueueMany(tracks);
+  const wanted = (Array.isArray(tracks) ? tracks : []).filter(Boolean);
+  if (!wanted.length) return state.queue.length;
+
+  let rest = wanted;
   if (!state.track) {
-    playTrack(track);
-    return 0;
+    playTrack(wanted[0]);
+    rest = wanted.slice(1);
   }
-  state.queue.push(track);
-  note(`Next: ${track.t}`);
-  paintTrack();
+  rest.forEach((track) => { state.queue.push({ qid: ++queueSeq, track }); });
+
+  if (rest.length) {
+    note(rest.length === 1
+      ? `Next: ${rest[0].t}`
+      : `${rest.length} songs added to the queue`);
+  }
+  queueChanged();
   return state.queue.length;
 }
 
-/** What is waiting, first to play first. A copy. */
+/** What is waiting, first to play first. The tracks only, a copy. */
 export function queued() {
   if (HOST) return HOST.queued();
-  return state.queue.slice();
+  return state.queue.map((entry) => entry.track);
+}
+
+/** What is waiting, as { qid, track }, for a panel that has to point
+    at one entry. Two entries for the same song have different ids. */
+export function queueEntries() {
+  if (HOST) return HOST.queueEntries();
+  return state.queue.map((entry) => ({ qid: entry.qid, track: entry.track }));
+}
+
+/** Take one entry out by its id. False if it has already gone (it
+    started playing, or was removed from somewhere else). */
+export function removeFromQueue(qid) {
+  if (HOST) return HOST.removeFromQueue(qid);
+  const at = state.queue.findIndex((entry) => entry.qid === qid);
+  if (at < 0) return false;
+  state.queue.splice(at, 1);
+  queueChanged();
+  return true;
 }
 
 export function clearQueue() {
   if (HOST) { HOST.clearQueue(); return; }
+  if (!state.queue.length) return;
   state.queue = [];
+  queueChanged();
+}
+
+/** The next id. Never reused, so a stale click cannot hit a newer
+    entry that happens to hold the same song. */
+let queueSeq = 0;
+
+const queueListeners = new Set();
+
+/** Tell the bar and every panel that the queue is not what it was. */
+function queueChanged() {
   if (state.track) paintTrack();
+  paintQueueButton();
+  const entries = state.queue.map((entry) => ({ qid: entry.qid, track: entry.track }));
+  queueListeners.forEach((fn) => {
+    try { fn(entries); } catch { /* a panel must not take the player down */ }
+  });
+}
+
+/** Be told whenever the queue changes, and once straight away.
+    Returns the unsubscribe. */
+export function onQueue(fn) {
+  if (HOST) {
+    const off = HOST.onQueue(fn);
+    window.addEventListener('pagehide', off, { once: true });
+    return off;
+  }
+  queueListeners.add(fn);
+  fn(queueEntries());
+  return () => queueListeners.delete(fn);
+}
+
+/** The count on the bar's queue button. */
+function paintQueueButton() {
+  if (!ui.queueN) return;
+  const n = state.queue.length;
+  ui.queueN.hidden = n === 0;
+  ui.queueN.textContent = n > 99 ? '99+' : String(n);
+  ui.queueBtn.setAttribute('aria-label', n ? `Up next, ${n} waiting` : 'Up next');
 }
 
 /** Take the next queued track. The context's own cursor is untouched,
     so when this one ends the running order resumes where it was. */
 function serveQueue() {
-  const track = state.queue.shift();
+  const entry = state.queue.shift();
   if (state.context === 'vault' && state.track) state.history.push(state.track);
   state.fromQueue = true;
-  return load(track);
+  const started = load(entry.track);
+  queueChanged();
+  return started;
 }
 
 /**
@@ -1269,6 +1907,23 @@ export function timing() {
 }
 
 /**
+ * Jump to a position, in seconds. Clamped to the song, so a click on a
+ * lyric stamped past the end of a short file lands at the end rather
+ * than throwing. Nothing loaded, or no length known yet: nothing
+ * happens. Returns where it went, or null.
+ */
+export function seekTo(sec) {
+  if (HOST) return HOST.seekTo(sec);
+  const want = Number(sec);
+  if (!state.track || !Number.isFinite(want)) return null;
+  const total = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : null;
+  if (total === null) return null;
+  const to = Math.min(Math.max(0, want), Math.max(0, total - 0.05));
+  try { audio.currentTime = to; } catch { return null; }
+  return to;
+}
+
+/**
  * Move the volume by `delta` (0.05 is five points), clamped to 0..1, and
  * keep the bar's slider, the mute icon and the saved level in step with
  * it, exactly as dragging the slider does. Returns the new level. A
@@ -1276,15 +1931,21 @@ export function timing() {
  */
 export function nudgeVolume(delta) {
   if (HOST) return HOST.nudgeVolume(delta);
-  const level = Math.min(1, Math.max(0, Math.round((audio.volume + delta) * 100) / 100));
+  level = Math.min(1, Math.max(0, Math.round((level + delta) * 100) / 100));
   audio.volume = level;
-  audio.muted = level === 0;
+  setMuted(level === 0);
   if (mounted) {
     ui.volume.value = String(Math.round(level * 100));
     paintVolume();
   }
   try { localStorage.setItem(VOL_KEY, String(level)); } catch { /* refused */ }
   return level;
+}
+
+/** Mute both elements, so a crossfade does not un-mute the other. */
+function setMuted(on) {
+  audio.muted = on;
+  if (spare) spare.muted = on;
 }
 
 /** Play, or pause. */
@@ -1420,6 +2081,7 @@ export function stop() {
   tick();
   flushListened();
   playId = null;
+  finishFade();
   audio.pause();
   audio.removeAttribute('src');
   // Releases the buffered file rather than leaving the element holding
@@ -1427,11 +2089,18 @@ export function stop() {
   // below already stands aside for.
   audio.load();
   clearApiTimer();
+  // Nothing left to count down to, and nothing left to be queued
+  clearSleepTimers();
+  sleep.mode = null;
+  sleep.until = 0;
   state.track = null;
   state.source = null;
   state.history = [];
   state.queue = [];
   state.fromQueue = false;
+  sleepChanged();
+  queueChanged();
+  labChanged();
   if (mounted) {
     ui.bar.hidden = true;
     paintOrigin();
@@ -1566,6 +2235,15 @@ function wire() {
   });
   ui.shot.addEventListener('click', openTrack);
 
+  // The three panels belong to the shell; each press says which button
+  // so the panel can sit above it.
+  [['queueBtn', 'nine:open-queue'], ['lab', 'nine:open-lab'], ['sleep', 'nine:open-sleep']]
+    .forEach(([name, type]) => {
+      ui[name].addEventListener('click', () => {
+        document.dispatchEvent(new CustomEvent(type, { detail: { anchor: ui[name] } }));
+      });
+    });
+
   /* ---- Seeking ----
      While a drag is in flight the element must not fight the reader
      for the handle, so timeupdate stops writing to the input until
@@ -1589,14 +2267,15 @@ function wire() {
 
   /* ---- Volume ---- */
   ui.volume.addEventListener('input', () => {
-    audio.volume = Number(ui.volume.value) / 100;
-    audio.muted = audio.volume === 0;
+    level = Number(ui.volume.value) / 100;
+    audio.volume = level;
+    setMuted(level === 0);
     paintVolume();
-    try { localStorage.setItem(VOL_KEY, String(audio.volume)); } catch { /* refused */ }
+    try { localStorage.setItem(VOL_KEY, String(level)); } catch { /* refused */ }
   });
 
   ui.mute.addEventListener('click', () => {
-    audio.muted = !audio.muted;
+    setMuted(!audio.muted);
     paintVolume();
   });
 
@@ -1619,23 +2298,58 @@ function wire() {
     }
   });
 
-  /* ---- The element itself ---- */
-  audio.addEventListener('play', () => {
+  /* ---- The elements themselves ----
+     Both are bound the same way, and every handler first checks that
+     the event is the live element's: the one fading out is still
+     playing, pausing and ending, and none of that is the bar's
+     business. */
+  bindElement(audio);
+
+  // A navigation, or the window closing, is the last chance to record
+  // where we were. Both are listened for: which of them WebView2 fires
+  // on the way out has not been measured, and the timeupdate write
+  // above is at most a second behind either way.
+  const last = () => {
+    tick();
+    flushListened();
+    saveResume();
+  };
+  window.addEventListener('pagehide', last);
+  window.addEventListener('beforeunload', last);
+
+  wireMediaSession();
+}
+
+/** Bind the playback events to one <audio> element. */
+function bindElement(el) {
+  el.addEventListener('play', () => {
+    if (el !== audio) return;
     lastPos = audio.currentTime || 0;
     logStart();
+    lab.fx.resume();
     paintPlaying(true);
     saveResume();
   });
 
-  audio.addEventListener('pause', () => {
+  // The incoming song is making sound: the overlap is timed from here
+  el.addEventListener('playing', () => {
+    if (el !== audio) return;
+    rampStart();
+  });
+
+  el.addEventListener('pause', () => {
+    if (el !== audio) return;
     pausedAt = Date.now();
+    // A pause in the middle of a fade stops both
+    finishFade();
     tick();
     flushListened();
     paintPlaying(false);
     saveResume();
   });
 
-  audio.addEventListener('loadedmetadata', () => {
+  el.addEventListener('loadedmetadata', () => {
+    if (el !== audio) return;
     clearApiTimer();
     paintTimes();
     ui.range.disabled = !(Number.isFinite(audio.duration) && audio.duration > 0);
@@ -1643,10 +2357,16 @@ function wire() {
     presenceSync();
   });
 
-  // A seek moves the elapsed time Discord is counting from
-  audio.addEventListener('seeked', presenceSync);
+  // A seek moves the elapsed time Discord is counting from, and is a
+  // position worth keeping straight away
+  el.addEventListener('seeked', () => {
+    if (el !== audio) return;
+    presenceSync();
+    saveResume();
+  });
 
-  audio.addEventListener('timeupdate', () => {
+  el.addEventListener('timeupdate', () => {
+    if (el !== audio) return;
     if (!seeking && Number.isFinite(audio.duration) && audio.duration > 0) {
       ui.range.value = String(Math.round((audio.currentTime / audio.duration) * 1000));
       fill(ui.range);
@@ -1660,11 +2380,28 @@ function wire() {
       saveResume();
       flushListened();
     }
+
+    maybeCrossfade();
   });
 
-  audio.addEventListener('ended', () => {
+  el.addEventListener('ended', () => {
+    if (el !== audio) return;
     tick();
     flushListened();
+
+    // "Stop after this song": it ends here, whatever was due next
+    if (sleep.mode === 'song') {
+      clearSleepTimers();
+      sleep.mode = null;
+      sleep.until = 0;
+      note('Sleep timer: stopped after this song');
+      sleepChanged();
+      paintPlaying(false);
+      ui.range.value = '0';
+      fill(ui.range);
+      presenceSync();
+      return;
+    }
 
     if (state.repeat === 'one') {
       // Around again is another play of the same track
@@ -1690,7 +2427,9 @@ function wire() {
     next({ auto: true });
   });
 
-  audio.addEventListener('error', () => {
+  el.addEventListener('error', () => {
+    // The element that was fading out is emptied on purpose
+    if (el !== audio) return;
     // stop() clears the source on purpose, and that fires this too
     if (!audio.getAttribute('src')) return;
 
@@ -1706,22 +2445,6 @@ function wire() {
     ui.sub.textContent = 'That file would not play';
     paintPlaying(false);
   });
-
-  // A navigation, or the window closing, is the last chance to record
-  // where we were. Both are listened for: which of them WebView2 fires
-  // on the way out has not been measured, and the timeupdate write
-  // above is at most a second behind either way.
-  const last = () => {
-    tick();
-    flushListened();
-    saveResume();
-  };
-  window.addEventListener('pagehide', last);
-  window.addEventListener('beforeunload', last);
-  // A seek is a position worth keeping straight away
-  audio.addEventListener('seeked', saveResume);
-
-  wireMediaSession();
 }
 
 /* ---------- Boot ---------- */

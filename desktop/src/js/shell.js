@@ -27,6 +27,8 @@
 import * as player from './player.js';
 import { initAmbient } from './ambient.js';
 import { initHotkeys } from './hotkeys.js';
+import { initQueuePanel } from './queue-panel.js';
+import { initLabPanel } from './lab-panel.js';
 import { invoke, inTauri } from './tauri.js';
 
 window.__nine_player = player;
@@ -200,6 +202,15 @@ initHotkeys({ player, frame, screenUp: ambient.isOn, onAction: ambient.note });
 // The bar's expand button: the screen now, not after thirty seconds.
 document.addEventListener('nine:open-screen', () => ambient.show());
 
+/* ---------- The panels over the bar ----------
+   Up next, the sound lab and the sleep timer. Each listens for the
+   event its bar button raises (nine:open-queue, nine:open-lab,
+   nine:open-sleep). Exposed for the harness. */
+window.__nine_panels = {
+  queue: initQueuePanel({ player, frame }),
+  ...initLabPanel({ player, frame })
+};
+
 /* ---------- New release ----------
    update.rs does the checking, downloading and installing through
    Tauri's updater plugin; this is the pop-up and the two decisions
@@ -370,6 +381,7 @@ if (inTauri) {
 
 const SHELL_FILES = new Set([
   'shell.html', 'js/shell.js', 'js/player.js', 'js/ambient.js', 'js/hotkeys.js', 'js/lyrics.js',
+  'js/fx.js', 'js/popover.js', 'js/queue-panel.js', 'js/lab-panel.js',
   // player.js imports, any of which changes the player's behaviour
   'js/config.js', 'js/tauri.js', 'js/utils.js', 'js/covers.js', 'js/ui.js', 'js/db.js',
   'js/picker.js'

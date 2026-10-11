@@ -206,8 +206,15 @@ export function renderChips(data, state, onSelect) {
   const counts = {};
   data.forEach((t) => { counts[t.c] = (counts[t.c] || 0) + 1; });
 
+  // The known categories in their set order, then any the archive has
+  // added since this build, so a new one gets a chip (in the accent
+  // colour) instead of sitting silently under All.
+  const unknown = Object.keys(counts)
+    .filter((c) => c && !CATEGORIES.includes(c))
+    .sort();
   const items = [{ key: 'all', name: 'All', n: data.length }].concat(
     CATEGORIES.filter((c) => counts[c])
+      .concat(unknown)
       .map((c) => ({ key: c, name: c, n: counts[c] }))
   );
 
@@ -280,7 +287,24 @@ function eqBars() {
   return eq;
 }
 
-function buildCard(track, onOpen, onAdd, onPlay) {
+/** Three lines and a plus: put this song in the queue. */
+function queueIcon() {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2.2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+
+  const path = document.createElementNS(ns, 'path');
+  path.setAttribute('d', 'M4 6h11M4 12h11M4 18h7M18 13v8M14 17h8');
+  svg.appendChild(path);
+  return svg;
+}
+
+function buildCard(track, onOpen, onAdd, onPlay, onQueue) {
   const li = make('li', 'cell');
   // What app.js matches the playing track against, so the mark can be
   // put on a card without re-running the filter to find it
@@ -370,6 +394,16 @@ function buildCard(track, onOpen, onAdd, onPlay) {
     li.appendChild(add);
   }
 
+  // The same song can be queued as many times as it is pressed
+  if (onQueue) {
+    const queue = make('button', 'card-queue');
+    queue.type = 'button';
+    queue.appendChild(queueIcon());
+    queue.appendChild(make('span', 'sr-only', `Add ${track.t} to the queue`));
+    queue.addEventListener('click', () => onQueue(track, queue));
+    li.appendChild(queue);
+  }
+
   return li;
 }
 
@@ -394,11 +428,11 @@ export function renderSkeleton() {
  * add-to-playlist button and a play button on every card; leaving
  * them out renders the grid exactly as before.
  */
-export function renderGrid(list, shown, onOpen, onAdd, onPlay) {
+export function renderGrid(list, shown, onOpen, onAdd, onPlay, onQueue) {
   const batch = list.slice(0, shown);
 
   const frag = document.createDocumentFragment();
-  batch.forEach((track) => frag.appendChild(buildCard(track, onOpen, onAdd, onPlay)));
+  batch.forEach((track) => frag.appendChild(buildCard(track, onOpen, onAdd, onPlay, onQueue)));
 
   el.rows.textContent = '';
   el.rows.appendChild(frag);

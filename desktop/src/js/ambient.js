@@ -107,9 +107,11 @@ function paintLyrics(slot, result, again = false) {
 
   if (result.state === 'found') {
     if (result.lines) {
-      const list = make('ol', 'amb-lines');
+      // Pressing a line jumps the song to it; initAmbient() listens.
+      const list = make('ol', 'amb-lines is-seekable');
       slot.items = result.lines.map((l) => {
         const li = make('li', 'amb-lyric', l.text || '♪');
+        li.title = 'Jump to this line';
         list.appendChild(li);
         return li;
       });
@@ -351,6 +353,21 @@ export function initAmbient({ player, frame }) {
   }
   slots.forEach((slot) => slot.retry.addEventListener('click', () => retryLyrics(slot)));
 
+  /** A press on a timed line: seek there, and move the highlight now
+      rather than at the next half-second tick. Plain lyrics have no
+      times, so they have no lines to press. Only the slot on show
+      answers; the other is behind it and takes no pointer. */
+  slots.forEach((slot) => slot.lyr.addEventListener('click', (event) => {
+    const li = event.target && event.target.closest ? event.target.closest('.amb-lyric') : null;
+    if (!li || !slot.lines || slot !== slots[front]) return;
+    const i = slot.items.indexOf(li);
+    if (i < 0) return;
+    const to = player.seekTo(slot.lines[i].at);
+    if (to === null) return;
+    syncLyrics(slot, to);
+    paintProgress();
+  }));
+
   function paintProgress() {
     const t = player.timing();
     elapsed.textContent = clock(t.at);
@@ -447,9 +464,23 @@ export function initAmbient({ player, frame }) {
     if (!now.track) hide();
   });
 
+  /* The two Settings choices: whether the screen may come up on its
+     own, and after how long. The bar's button is not affected: that is
+     asking for it. A player with no onSettings (an old harness) keeps
+     the defaults. */
+  let idleOn = true;
+  let idleMs = IDLE_MS;
+  if (typeof player.onSettings === 'function') {
+    player.onSettings((p) => {
+      idleOn = p.idle !== false;
+      const s = Number(p.idleSeconds);
+      idleMs = (Number.isFinite(s) && s >= 5 ? s : IDLE_MS / 1000) * 1000;
+    });
+  }
+
   setInterval(() => {
-    if (on || !playing || !shownTrack || anyDialogOpen(frame)) return;
-    if (Date.now() - lastInput >= IDLE_MS) show();
+    if (!idleOn || on || !playing || !shownTrack || anyDialogOpen(frame)) return;
+    if (Date.now() - lastInput >= idleMs) show();
   }, 1000);
 
   return { show, hide, note, isOn: () => on };

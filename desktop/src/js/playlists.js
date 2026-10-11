@@ -22,8 +22,9 @@ import { buildCover, buildAssignments, coverSpec } from './covers.js';
 import { swatchFor } from './ui.js';
 import {
   initPlayer, playFromPlaylist, toggleShuffle, isShuffled,
-  toggle, onPlayback, sameTrack, enqueue
+  toggle, onPlayback, sameTrack, enqueue, enqueueMany
 } from './player.js';
+import { createSelect } from './select.js';
 import { loadArchive, invoke, inTauri } from './tauri.js';
 import {
   listPlaylists, createPlaylist, updatePlaylist, deletePlaylist,
@@ -444,7 +445,55 @@ function renderRows() {
 
   // Fresh rows carry no mark, so it goes back on here
   markPlaying();
+  markPicked();
 }
+
+/* ---------- Select mode and "Add all" ----------
+   Pick several rows and queue them together, or queue the whole list
+   with one press. The same song can already be waiting; the queue
+   keeps every request. */
+
+const picking = createSelect({
+  parent: el.plActs,
+  scope: document.body,
+  keyOf: (item) => item.id,
+  // Queue order is playlist order, whatever order the rows were picked in
+  ordered: () => items,
+  every: () => shown,
+  onQueue: (list) => enqueueMany(list),
+  say
+});
+
+const queueAll = make('button', 'btn btn-ghost pl-queue-all', 'Add all to queue');
+queueAll.type = 'button';
+el.plActs.appendChild(queueAll);
+queueAll.addEventListener('click', () => {
+  if (!items.length) return;
+  const waiting = enqueueMany(items);
+  say(`${items.length} ${items.length === 1 ? 'song' : 'songs'} added to the queue`
+    + (waiting ? ` (${waiting} waiting)` : ''));
+});
+
+function markPicked() {
+  const rows = el.plRows.children;
+  shown.forEach((item, i) => {
+    if (rows[i]) rows[i].classList.toggle('is-picked', picking.has(item));
+  });
+}
+
+// Capture, so a row's own double click and buttons never see a press
+// that belongs to the selection
+el.plRows.addEventListener('click', (event) => {
+  if (!picking.active()) return;
+  const row = event.target.closest ? event.target.closest('.pl-row') : null;
+  if (!row) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const i = Array.prototype.indexOf.call(el.plRows.children, row);
+  if (i >= 0 && shown[i]) picking.toggle(shown[i]);
+}, true);
+
+picking.onChange(markPicked);
 
 /**
  * Mark the row holding the loaded track.
