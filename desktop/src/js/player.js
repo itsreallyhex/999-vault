@@ -584,6 +584,8 @@ const MUTE = ['M11 5L6 9H2v6h4l5 4V5z', 'M22 9l-6 6', 'M16 9l6 6'];
 const CROSS = 'M6 6l12 12M18 6L6 18';
 const SAVE = ['M12 4v11', 'M7 10l5 5 5-5', 'M4 19h16'];
 const PLUS = ['M12 5v14', 'M5 12h14'];
+/** Four corner brackets: open the full-window now playing screen. */
+const EXPAND = ['M4 9V4h5', 'M20 9V4h-5', 'M4 15v5h5', 'M20 15v5h-5'];
 
 /** An icon-only button, labelled for anyone not looking at it. */
 function control(cls, label, svg) {
@@ -709,6 +711,13 @@ function mount() {
   ui.save = control('mini-btn mini-save', 'Save to this machine', icon(...SAVE));
   ui.save.hidden = true;
   side.appendChild(ui.save);
+
+  // The idle screen, now, without waiting for it. Only the shell has
+  // that screen; a bare page raises the event and nothing listens.
+  ui.screen = control('mini-btn mini-screen', 'Open the now playing screen', icon(...EXPAND));
+  ui.screen.title = 'Now playing screen';
+  ui.screen.hidden = true;
+  side.appendChild(ui.screen);
 
   ui.mute = control('mini-btn mini-vol-btn', 'Mute', icon(...VOL));
   side.appendChild(ui.mute);
@@ -853,6 +862,7 @@ function paintSide() {
   if (!ui.add) return;
   const track = state.track;
   ui.add.hidden = !track;
+  ui.screen.hidden = !track;
   const wanted = Boolean(track && track.rid && inTauri && !byId.has(track.rid));
   // Kept up while its own save is in flight, so the busy state is
   // visible even though the index may already know the file.
@@ -1245,6 +1255,38 @@ export function playFromPlaylist(playlistId, items, index) {
   return load(state.list[state.order[state.cursor]]);
 }
 
+/**
+ * Where the element is: seconds in, and the length (0 until metadata
+ * lands). For the idle screen's progress line, which polls it while up
+ * rather than listening to timeupdate on an element it cannot see.
+ */
+export function timing() {
+  if (HOST) return HOST.timing();
+  return {
+    at: audio.currentTime || 0,
+    total: Number.isFinite(audio.duration) ? audio.duration : 0
+  };
+}
+
+/**
+ * Move the volume by `delta` (0.05 is five points), clamped to 0..1, and
+ * keep the bar's slider, the mute icon and the saved level in step with
+ * it, exactly as dragging the slider does. Returns the new level. A
+ * nudge up from muted unmutes, because the slider does the same.
+ */
+export function nudgeVolume(delta) {
+  if (HOST) return HOST.nudgeVolume(delta);
+  const level = Math.min(1, Math.max(0, Math.round((audio.volume + delta) * 100) / 100));
+  audio.volume = level;
+  audio.muted = level === 0;
+  if (mounted) {
+    ui.volume.value = String(Math.round(level * 100));
+    paintVolume();
+  }
+  try { localStorage.setItem(VOL_KEY, String(level)); } catch { /* refused */ }
+  return level;
+}
+
 /** Play, or pause. */
 export function toggle() {
   if (HOST) { HOST.toggle(); return; }
@@ -1516,6 +1558,9 @@ function wire() {
   ui.repeat.addEventListener('click', cycleRepeat);
   ui.close.addEventListener('click', stop);
   ui.save.addEventListener('click', saveTrack);
+  ui.screen.addEventListener('click', () => {
+    if (state.track) document.dispatchEvent(new CustomEvent('nine:open-screen'));
+  });
   ui.add.addEventListener('click', () => {
     if (state.track) openPicker(state.track, ui.add);
   });

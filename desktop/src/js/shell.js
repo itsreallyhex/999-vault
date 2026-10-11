@@ -25,6 +25,8 @@
    ============================================================ */
 
 import * as player from './player.js';
+import { initAmbient } from './ambient.js';
+import { initHotkeys } from './hotkeys.js';
 import { invoke, inTauri } from './tauri.js';
 
 window.__nine_player = player;
@@ -182,6 +184,21 @@ frame.addEventListener('load', () => {
 // front of the sidebar, which is how the sidebar first came up on the
 // right.
 document.querySelector('.side-nav').after(frame);
+
+/* ---------- The idle screen ----------
+   After the frame is in the document, so there is a window to listen
+   on. See js/ambient.js. Exposed for the harness, which cannot wait
+   thirty seconds for it. */
+const ambient = initAmbient({ player, frame });
+window.__nine_ambient = ambient;
+
+/* ---------- Keyboard shortcuts ----------
+   Space, the arrows and Ctrl+arrows, on every page and on the idle
+   screen. See js/hotkeys.js for what it stands aside for. */
+initHotkeys({ player, frame, screenUp: ambient.isOn, onAction: ambient.note });
+
+// The bar's expand button: the screen now, not after thirty seconds.
+document.addEventListener('nine:open-screen', () => ambient.show());
 
 /* ---------- New release ----------
    update.rs does the checking, downloading and installing through
@@ -352,7 +369,7 @@ if (inTauri) {
    swap handles it, so it never forces a shell reload. */
 
 const SHELL_FILES = new Set([
-  'shell.html', 'js/shell.js', 'js/player.js',
+  'shell.html', 'js/shell.js', 'js/player.js', 'js/ambient.js', 'js/hotkeys.js', 'js/lyrics.js',
   // player.js imports, any of which changes the player's behaviour
   'js/config.js', 'js/tauri.js', 'js/utils.js', 'js/covers.js', 'js/ui.js', 'js/db.js',
   'js/picker.js'
