@@ -31,6 +31,9 @@ const SOURCE_KEY: &str = "source";
 const DISCORD_KEY: &str = "discord";
 /// Whether the shell asks the release for a newer version on launch.
 const UPDATES_KEY: &str = "updates";
+/// Whether the idle screen may ask LRCLIB for lyrics. See lyrics.rs for
+/// exactly what a request carries. Off still reads a lyrics file.
+const LYRICS_KEY: &str = "lyrics";
 const ROOT_KEY: &str = "data_root";
 
 /// What the Settings page draws.
@@ -41,6 +44,8 @@ pub struct Settings {
     pub discord: bool,
     /// Check for a newer release on launch. Missing key means yes.
     pub updates: bool,
+    /// Look lyrics up online for the idle screen. Missing key means yes.
+    pub lyrics: bool,
     /// The version this binary is, for the Settings page to show.
     pub version: String,
     /// The archive as resolved right now, with which rule found it.
@@ -87,12 +92,21 @@ pub fn updates_on(app: &AppHandle) -> bool {
         .unwrap_or(true)
 }
 
+/// Whether the online lyrics lookup is allowed. Missing key means yes.
+pub fn lyrics_on(app: &AppHandle) -> bool {
+    let (_, doc) = document(app);
+    doc.get(LYRICS_KEY)
+        .and_then(|item| item.as_bool())
+        .unwrap_or(true)
+}
+
 fn current(app: &AppHandle) -> Settings {
     let root = data::data_root(app.clone());
     Settings {
         source: source(app),
         discord: discord_on(app),
         updates: updates_on(app),
+        lyrics: lyrics_on(app),
         version: app.package_info().version.to_string(),
         config_file: root.config_file.clone(),
         data_root_setting: data::config_str(app, ROOT_KEY).unwrap_or_default(),
@@ -131,6 +145,10 @@ pub fn settings_set(app: AppHandle, key: String, value: serde_json::Value) -> Re
         UPDATES_KEY => {
             let on = value.as_bool().ok_or("updates must be true or false")?;
             doc[UPDATES_KEY] = toml_edit::value(on);
+        }
+        LYRICS_KEY => {
+            let on = value.as_bool().ok_or("lyrics must be true or false")?;
+            doc[LYRICS_KEY] = toml_edit::value(on);
         }
         ROOT_KEY => {
             // Empty clears the setting and the lookup rules take over.

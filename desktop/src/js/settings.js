@@ -26,7 +26,7 @@ import { invoke, inTauri } from './tauri.js';
 import { initPlayer, applySettings } from './player.js';
 
 const el = {};
-['discord', 'discordWord', 'updates', 'updatesWord', 'versionLine', 'checkUpdates',
+['discord', 'discordWord', 'updates', 'updatesWord', 'lyrics', 'lyricsWord', 'versionLine', 'checkUpdates',
   'rootPath', 'rootFound', 'rootBy', 'pickRoot', 'clearRoot',
   'restartNote', 'cfgPath', 'status', 'summary']
   .forEach((id) => { el[id] = document.getElementById(id); });
@@ -39,6 +39,7 @@ const DEFAULTS = {
   source: 'local',
   discord: true,
   updates: true,
+  lyrics: true,
   version: '',
   data_root: { path: '', source: 'not found', exists: false, catalogue: false, covers: false, audio: false, audio_index: false },
   data_root_setting: '',
@@ -91,6 +92,11 @@ function draw(s) {
   el.updatesWord.textContent = updates ? el.updatesWord.dataset.on : el.updatesWord.dataset.off;
   el.versionLine.textContent = s.version ? `Version ${s.version}` : 'Version unknown';
 
+  // A binary older than this setting does not send the key: that is on
+  const lyrics = s.lyrics !== false;
+  el.lyrics.checked = lyrics;
+  el.lyricsWord.textContent = lyrics ? el.lyricsWord.dataset.on : el.lyricsWord.dataset.off;
+
   const root = s.data_root;
   ['catalogue', 'covers', 'audio'].forEach((k) => { held(k).dataset.on = String(Boolean(root[k])); });
   if (root.exists) {
@@ -133,6 +139,7 @@ function wire() {
 
   el.discord.addEventListener('change', () => set('discord', el.discord.checked));
   el.updates.addEventListener('change', () => set('updates', el.updates.checked));
+  el.lyrics.addEventListener('change', () => set('lyrics', el.lyrics.checked));
 
   // The check lives in the shell, which owns the pop-up. A newer
   // version opens it there; anything else is a line here.

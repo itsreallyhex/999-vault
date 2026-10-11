@@ -53,7 +53,7 @@ pub struct Saved {
 
 /// `<title> [<id8>].<ext>`, cleaned for Windows, falling back to the id.
 /// Mirrors `safe_name()` in save-audio.py character for character.
-fn safe_name(title: &str, id: &str, file_name: &str) -> String {
+pub(crate) fn safe_name(title: &str, id: &str, file_name: &str) -> String {
     let ext = Path::new(file_name)
         .extension()
         .map(|e| format!(".{}", e.to_string_lossy().to_lowercase()))

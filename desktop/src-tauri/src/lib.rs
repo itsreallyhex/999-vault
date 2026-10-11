@@ -11,6 +11,7 @@ use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 mod data;
 mod download;
 mod files;
+mod lyrics;
 mod pages;
 mod paths;
 mod presence;
@@ -69,6 +70,10 @@ pub fn run() {
 
             println!("999: discord   {}", presence::describe(&handle));
             println!("999: source    {} first", settings::source(&handle));
+            println!(
+                "999: lyrics    lookup {}; a .lrc or .txt file is the fallback",
+                if settings::lyrics_on(&handle) { "on (LRCLIB, when the idle screen is up)" } else { "off" }
+            );
 
             // The window is made here, not declared in tauri.conf.json.
             // A declared window resolves its page against devUrl in a
@@ -95,6 +100,7 @@ pub fn run() {
             data::read_audio_index,
             download::download_track,
             files::save_text,
+            lyrics::lyrics_get,
             update::update_check,
             update::update_install,
             tools::tools_status,

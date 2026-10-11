@@ -145,7 +145,25 @@
       </div>
     </section>
 
-    <section class="set-group" aria-labelledby="hArchive" style="--i: 3">
+    <section class="set-group" aria-labelledby="hLyrics" style="--i: 3">
+      <div class="set-row">
+        <div class="set-group-head">
+          <span class="set-icon" aria-hidden="true"><svg><use href="#i-cloud"/></svg></span>
+          <div>
+            <h2 class="set-name" id="hLyrics">Look up lyrics online</h2>
+            <p class="set-desc">On the idle screen, ask LRCLIB for the lyrics of the song that is playing. It sends the song's title and the artist name and nothing else: no account, no id, no history. Each song is asked about once and the answer is kept on this machine. Their server sees your IP address, as any website does.</p>
+            <p class="set-desc">Off, or when nothing is found, the app looks for a .lrc or .txt file named like the song, beside it or in the lyrics folder of the archive.</p>
+          </div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="lyrics" checked>
+          <span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span>
+          <span class="switch-word" id="lyricsWord" data-on="On" data-off="Off">On</span>
+        </label>
+      </div>
+    </section>
+
+    <section class="set-group" aria-labelledby="hArchive" style="--i: 4">
       <div class="set-row">
         <div class="set-group-head">
           <span class="set-icon" aria-hidden="true"><svg><use href="#i-folder"/></svg></span>
