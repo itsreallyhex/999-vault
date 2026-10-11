@@ -2,7 +2,7 @@
 # Any variant too: a .env.bak or .env.local holding a bearer token must not
 # become the one file that leaks it.
 /web/.env.*
-/CLAUDE.md
+CLAUDE.md
 
 # Saved cover images. Thousands of binaries that git would carry forever,
 # and `python tools/save-catalogue.py --covers`, run from web/, rebuilds
@@ -17,6 +17,10 @@
 # web/tools/save-audio.py. This must never end up in a commit.
 /web/data/audio/
 /web/data/audio-index.json
+# Kept lyrics answers, one JSON file per song the desktop app has asked
+# about. Another party's text, on this machine only: it is not ours to
+# commit. See desktop/CLAUDE.md, "The idle screen".
+/web/data/lyrics/
 *.mp3
 *.wav
 *.m4a
@@ -39,3 +43,9 @@ __pycache__/
 /desktop/node_modules/
 /desktop/src-tauri/target/
 /desktop/src-tauri/gen/
+docs/CLAUDE.original.md
+docs/
+CLAUDE.new.md
+web/CLAUDE.md
+desktop/CLAUDE.md
+TODO.md
