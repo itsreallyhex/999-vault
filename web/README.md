@@ -1,5 +1,15 @@
 # 999
 
+> **This version is frozen and will not receive updates**, the way the
+> desktop app does. Work goes into the app, which is described in the readme
+> at the root of this repo. The pages, the scripts and this readme stay as
+> they were when it stopped being updated, so the figures below are from that
+> time and the archive has since grown.
+>
+> One thing here is still live: `web/data/` is the app's data folder when it
+> runs from a checkout, and `web/data/catalogue.json` is the catalogue the
+> installer is built with. Leave that folder where it is.
+
 A personal project. A fan-made site about the Juice WRLD archive: a home page,
 a searchable index of the archive called the Vault, playlists saved in the
 browser, and a tribute page.
