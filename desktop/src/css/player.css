@@ -36,7 +36,13 @@
 .mini {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-player);
   display: grid; align-items: center;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  /* The bar sits to the right of the 224px sidebar, so the room it has
+     is the window minus that. Identity keeps a floor, the transport
+     takes what is left up to 520px, and the buttons at the right take
+     exactly what they need. (Three equal columns left the buttons
+     wider than their column once there were nine of them, and they
+     spilled over the transport.) */
+  grid-template-columns: minmax(200px, 1fr) minmax(280px, 520px) auto;
   gap: clamp(0.75rem, 2vw, 1.75rem);
   padding: 0.7rem clamp(0.75rem, 2.5vw, 1.5rem);
   min-height: var(--mini-h);
@@ -167,7 +173,8 @@ body.has-player { padding-bottom: calc(var(--mini-h) + 0.5rem); }
 
 .mini-mid {
   display: flex; flex-direction: column; align-items: center; gap: 0.3rem;
-  width: min(560px, 46vw);
+  /* The grid column sets the width (280px to 520px) */
+  width: 100%; min-width: 0;
 }
 
 .mini-row { display: flex; align-items: center; gap: 0.25rem; }
@@ -285,10 +292,14 @@ body.has-player { padding-bottom: calc(var(--mini-h) + 0.5rem); }
 
 /* ---------- Volume ---------- */
 .mini-side {
-  display: flex; align-items: center; justify-content: flex-end; gap: 0.35rem;
+  display: flex; align-items: center; justify-content: flex-end; gap: 0.1rem;
 }
+/* Nine controls live here now: a little narrower than the 44px touch
+   size, with the height kept, so they fit in one row beside the
+   transport. The narrowest layouts put the 40px rule back below. */
+.mini-side .mini-btn { min-width: 38px; }
 
-.mini-volume { flex: 0 0 92px; width: 92px; }
+.mini-volume { flex: 0 0 76px; width: 76px; margin-left: 0.2rem; }
 .mini.is-muted .mini-vol-btn { color: var(--c-cut); }
 
 .mini-close:hover { color: var(--c-cut); background: rgba(251, 113, 133, 0.12); }
@@ -498,17 +509,16 @@ body.has-player { padding-bottom: calc(var(--mini-h) + 0.5rem); }
    goes: it is the one control the operating system also offers.
    ============================================================ */
 
-@media (max-width: 1040px) {
-  .mini-volume { display: none; }
-  .mini-mid { width: min(520px, 52vw); }
-}
-
-@media (max-width: 780px) {
+/* The bar is the window minus the 224px sidebar, so these are window
+   widths with that taken off: below 1200 the three columns (200px of
+   identity, 280px of transport, about 430px of buttons) no longer
+   fit and the bar goes to two rows. */
+@media (max-width: 1200px) {
   :root { --mini-h: 132px; }
 
-  /* Two rows: identity and volume across the top, the transport and
-     the seek bar underneath at full width, so the scrub target stays
-     big enough to hit with a thumb. */
+  /* Two rows: identity and the buttons across the top, the transport
+     and the seek bar underneath at full width, so the scrub target
+     stays big enough to hit with a thumb. */
   .mini {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
@@ -522,6 +532,13 @@ body.has-player { padding-bottom: calc(var(--mini-h) + 0.5rem); }
   .mini-mid { grid-area: mid; width: 100%; gap: 0.1rem; }
 
   .mini-shot { width: 44px; height: 44px; }
+}
+
+/* Narrow: the volume slider goes. It is the one control the
+   operating system also offers, and Ctrl with Left or Right still
+   works. */
+@media (max-width: 900px) {
+  .mini-volume { display: none; }
 }
 
 @media (max-width: 480px) {
