@@ -122,10 +122,33 @@
   mask-image: linear-gradient(transparent, #000 16%, #000 84%, transparent);
 }
 .amb-lyr.is-plain { overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.25) transparent; }
+/* Timed lyrics scroll too, by wheel or touch, with no bar drawn: the
+   song carries them along until they are scrolled by hand. */
+.amb-lyr.is-timed { overflow-y: auto; scrollbar-width: none; overscroll-behavior: contain; }
+.amb-lyr.is-timed::-webkit-scrollbar { display: none; }
 
+/* The window and its "Back to current line" button. Gone with the
+   window when there are no lyrics, so it takes no row. */
+.amb-lyrbox { position: relative; }
+.amb-lyrbox:has(> .amb-lyr[hidden]) { display: none; }
+.amb-back {
+  position: absolute; right: 0; bottom: 0.3rem; z-index: 1;
+  padding: 0.3rem 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.28); border-radius: 999px;
+  background: rgba(8, 7, 12, 0.6); color: rgba(246, 244, 251, 0.9);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+  font-size: var(--step--2); letter-spacing: 0.06em; cursor: pointer;
+  transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.amb-back[hidden] { display: none; }
+.amb-back:hover { background: rgba(8, 7, 12, 0.8); border-color: rgba(255, 255, 255, 0.5); }
+.amb-back:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* Room under the last line, so it can be carried to the middle too */
 .amb-lines {
-  position: relative; margin: 0; padding: 0; list-style: none;
-  transition: transform 520ms var(--ease);
+  position: relative; margin: 0; list-style: none;
+  padding: 0 0 calc(min(36vh, 19rem) / 2);
 }
 .amb-lyric {
   padding: 0.28rem 0;
@@ -135,7 +158,9 @@
   transition: color 300ms var(--ease);
 }
 .amb-lyric.is-past { color: rgba(246, 244, 251, 0.5); }
-.amb-lyric.is-now { color: #fff; font-weight: 600; }
+/* Same weight as the rest: a bolder line is wider, so it wrapped
+   differently from its neighbours and jumped when it became current. */
+.amb-lyric.is-now { color: #fff; }
 
 /* Timed lines can be pressed to jump the song there */
 .amb-lines.is-seekable .amb-lyric { cursor: pointer; }
@@ -189,11 +214,30 @@
 }
 .amb-time { font-size: var(--step--2); color: rgba(246, 244, 251, 0.72); min-width: 3ch; }
 .amb-time:last-child { text-align: right; }
+/* The line is a tall hit area with a thin track drawn inside it, so it
+   can be dragged without aiming at three pixels. */
 .amb-line {
-  position: relative; flex: 1 1 auto; height: 3px; border-radius: 3px;
-  background: rgba(255, 255, 255, 0.22); overflow: hidden;
+  position: relative; flex: 1 1 auto; height: 22px; cursor: pointer;
+  touch-action: none; user-select: none; -webkit-user-select: none;
 }
-.amb-line i { position: absolute; inset: 0 auto 0 0; width: 0; background: rgba(255, 255, 255, 0.92); border-radius: 3px; }
+.amb-line::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 50%;
+  height: 3px; margin-top: -1.5px; border-radius: 3px;
+  background: rgba(255, 255, 255, 0.22);
+}
+.amb-line i {
+  position: absolute; left: 0; top: 50%; width: 0;
+  height: 3px; margin-top: -1.5px; border-radius: 3px;
+  background: rgba(255, 255, 255, 0.92);
+}
+/* The handle, shown while the pointer is over the line or dragging it */
+.amb-line i::after {
+  content: ''; position: absolute; right: -6px; top: 50%;
+  width: 12px; height: 12px; margin-top: -6px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+  opacity: 0; transition: opacity var(--dur) var(--ease);
+}
+.amb-line:hover i::after, .amb-line.is-drag i::after { opacity: 1; }
 
 /* ---------- Key feedback ----------
    The bar is hidden under the screen, so a key that changes something

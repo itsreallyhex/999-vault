@@ -91,12 +91,20 @@ function makeSlot() {
   const other = make('button', 'amb-retry amb-other', 'Wrong lyrics? Try another version');
   other.type = 'button';
   other.hidden = true;
-  text.append(title, sub, lyr, src, retry, other);
+  // Timed lyrics can be scrolled by hand, and this puts them back on the
+  // line the song is at. Over the window's corner, so it takes no room.
+  const back = make('button', 'amb-back', 'Back to current line');
+  back.type = 'button';
+  back.hidden = true;
+  const lyrBox = make('div', 'amb-lyrbox');
+  lyrBox.append(lyr, back);
+  text.append(title, sub, lyrBox, src, retry, other);
   front.append(art, text);
   el.appendChild(front);
 
   return {
-    el, img, art, title, sub, lyr, src, retry, other,
+    el, img, art, title, sub, lyr, back, src, retry, other,
+    free: false,     // the lyrics were scrolled by hand and do not follow
     track: null,     // what the slot holds
     asked: null,     // the key lyrics were last asked for
     lines: null,     // timed lyrics: [{ at, text }]
@@ -115,7 +123,9 @@ function paintLyrics(slot, result, again = false) {
   slot.items = [];
   slot.list = null;
   slot.idx = -2;
-  slot.lyr.classList.remove('is-plain');
+  slot.free = false;
+  slot.back.hidden = true;
+  slot.lyr.classList.remove('is-plain', 'is-timed');
   // A second try only makes sense where a second look could differ
   slot.retry.hidden = !(result.state === 'none' || result.state === 'offline' || result.state === 'busy');
   slot.retry.disabled = false;
@@ -136,6 +146,7 @@ function paintLyrics(slot, result, again = false) {
         list.appendChild(li);
         return li;
       });
+      slot.lyr.classList.add('is-timed');
       slot.lyr.appendChild(list);
       slot.list = list;
       slot.lines = result.lines;
@@ -173,11 +184,36 @@ function paintLyrics(slot, result, again = false) {
   else slot.src.textContent = LYRICS_NOTE[result.state] || '';
 }
 
-/** Mark the line that is current at `sec` and bring it to the middle. */
+/** Scroll the window so the current line is in the middle. */
+function centerLine(slot, smooth) {
+  const cur = slot.items[slot.idx];
+  const top = cur ? Math.max(0, cur.offsetTop + cur.offsetHeight / 2 - slot.lyr.clientHeight / 2) : 0;
+  const still = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (typeof slot.lyr.scrollTo === 'function') {
+    slot.lyr.scrollTo({ top, behavior: smooth && !still ? 'smooth' : 'auto' });
+  } else {
+    slot.lyr.scrollTop = top;
+  }
+}
+
+/** Let go of the song's line (the person scrolled) or take it back
+    (the button, a pressed line, a drag of the progress line). */
+function setFree(slot, free) {
+  slot.free = free;
+  slot.back.hidden = !free;
+  if (!free && slot.list) centerLine(slot, true);
+}
+
+/** Mark the line that is current at `sec`, and bring it to the middle
+    unless the lyrics were scrolled away by hand. */
 function syncLyrics(slot, sec) {
   if (!slot.lines || !slot.list) return;
   const idx = activeIndex(slot.lines, sec);
   if (idx === slot.idx) return;
+  // The first line painted after the words arrive is put in place at
+  // once, not scrolled to from the top
+  const first = slot.idx === -2;
   slot.idx = idx;
 
   slot.items.forEach((li, i) => {
@@ -185,9 +221,7 @@ function syncLyrics(slot, sec) {
     li.classList.toggle('is-past', i < idx);
   });
 
-  const cur = slot.items[idx];
-  const up = cur ? Math.max(0, cur.offsetTop + cur.offsetHeight / 2 - slot.lyr.clientHeight / 2) : 0;
-  slot.list.style.transform = `translateY(${-up}px)`;
+  if (!slot.free) centerLine(slot, !first);
 }
 
 /** The slot painted for a track: blurred image, sharp cover, words. The
@@ -220,6 +254,8 @@ function fillSlot(slot, track) {
   slot.items = [];
   slot.list = null;
   slot.idx = -2;
+  slot.free = false;
+  slot.back.hidden = true;
   slot.lyr.textContent = '';
   slot.lyr.hidden = true;
   slot.src.textContent = '';
@@ -426,11 +462,74 @@ export function initAmbient({ player, frame }) {
     if (i < 0) return;
     const to = player.seekTo(slot.lines[i].at);
     if (to === null) return;
+    setFree(slot, false);
     syncLyrics(slot, to);
     paintProgress();
   }));
 
+  /* Scrolling the lyrics by hand lets go of the song's line until the
+     button is pressed, a line is pressed, or the progress line is
+     dragged. Only the wheel and touch count: the scroll that follows the
+     song fires neither. */
+  slots.forEach((slot) => {
+    const grab = () => {
+      if (slot.lines && slot === slots[front] && !slot.free) setFree(slot, true);
+    };
+    slot.lyr.addEventListener('wheel', grab, { passive: true });
+    slot.lyr.addEventListener('touchmove', grab, { passive: true });
+    slot.back.addEventListener('click', () => setFree(slot, false));
+  });
+
+  /* Dragging the progress line. The words follow the handle while it is
+     held; the song itself is moved once, on release, so a stream is not
+     asked for a new range at every pixel. */
+  let dragging = false;
+
+  function dragSecond(event) {
+    const t = player.timing();
+    if (!(t.total > 0)) return null;
+    const box = line.getBoundingClientRect();
+    if (!(box.width > 0)) return null;
+    const frac = Math.min(1, Math.max(0, (event.clientX - box.left) / box.width));
+    return { sec: frac * t.total, total: t.total };
+  }
+
+  function paintDrag(event) {
+    const at = dragSecond(event);
+    if (!at) return null;
+    elapsed.textContent = clock(at.sec);
+    lineFill.style.width = `${(at.sec / at.total) * 100}%`;
+    syncLyrics(slots[front], at.sec);
+    return at.sec;
+  }
+
+  function endDrag(event, commit) {
+    if (!dragging) return;
+    const at = commit ? dragSecond(event) : null;
+    dragging = false;
+    line.classList.remove('is-drag');
+    try { line.releasePointerCapture(event.pointerId); } catch { /* not held */ }
+    if (at) player.seekTo(at.sec);
+    paintProgress();
+  }
+
+  line.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || !(player.timing().total > 0)) return;
+    event.preventDefault();
+    dragging = true;
+    line.classList.add('is-drag');
+    try { line.setPointerCapture(event.pointerId); } catch { /* no capture */ }
+    // The words follow the handle, even if they were scrolled away
+    setFree(slots[front], false);
+    paintDrag(event);
+  });
+  line.addEventListener('pointermove', (event) => { if (dragging) paintDrag(event); });
+  line.addEventListener('pointerup', (event) => endDrag(event, true));
+  line.addEventListener('pointercancel', (event) => endDrag(event, false));
+
   function paintProgress() {
+    // The handle is held: the half-second tick must not pull it back
+    if (dragging) return;
     const t = player.timing();
     elapsed.textContent = clock(t.at);
     total.textContent = t.total > 0 ? clock(t.total) : (shownTrack && shownTrack.len) || '0:00';
@@ -458,6 +557,8 @@ export function initAmbient({ player, frame }) {
   function hide() {
     if (!on) return;
     on = false;
+    dragging = false;
+    line.classList.remove('is-drag');
     root.classList.remove('is-on');
     clearInterval(progTimer);
     clearTimeout(noteTimer);
@@ -486,6 +587,7 @@ export function initAmbient({ player, frame }) {
       // version" when they are there
       event.preventDefault();
       const stops = [close];
+      if (!slots[front].back.hidden) stops.push(slots[front].back);
       if (!slots[front].retry.hidden) stops.push(slots[front].retry);
       if (!slots[front].other.hidden) stops.push(slots[front].other);
       const at = stops.indexOf(document.activeElement);
