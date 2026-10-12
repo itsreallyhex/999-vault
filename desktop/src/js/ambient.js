@@ -538,6 +538,105 @@ export function initAmbient({ player, frame }) {
     syncLyrics(slots[front], t.at);
   }
 
+  /* ---------- Up next, on the screen ----------
+     The same lists the Up next sheet draws, as a glass panel at the
+     right: what was queued, then what follows on its own. A press on a
+     song plays it. The cross puts the panel away and a small "Up next"
+     button brings it back; the choice is kept, as a per-person
+     convenience. Nothing is drawn when nothing is coming. */
+  const QUEUE_KEY = '999:amb-queue';
+  const THEN_LABEL = {
+    playlist: 'Next in this playlist',
+    vault: 'Next, picked at random from the Vault',
+    'repeat-one': 'Repeat is on, so this plays again'
+  };
+  const QUEUE_ROWS = 8;
+  let queueOn = true;
+  try { queueOn = localStorage.getItem(QUEUE_KEY) !== 'off'; } catch { /* no storage */ }
+  let upNext = { queue: [], then: { kind: 'none', tracks: [], more: 0 } };
+
+  const queueBox = make('aside', 'amb-queue');
+  queueBox.setAttribute('aria-label', 'Up next');
+  queueBox.hidden = true;
+  const queueHead = make('div', 'amb-queue-head');
+  const queueCount = make('span', 'amb-queue-count mono', '');
+  const queueX = make('button', 'amb-queue-x');
+  queueX.type = 'button';
+  queueX.setAttribute('aria-label', 'Hide up next');
+  queueX.appendChild(crossIcon());
+  queueHead.append(make('h2', 'amb-queue-title', 'Up next'), queueCount, queueX);
+  const queueBody = make('div', 'amb-queue-body');
+  queueBox.append(queueHead, queueBody);
+
+  const queuePill = make('button', 'amb-queue-pill', 'Up next');
+  queuePill.type = 'button';
+  queuePill.hidden = true;
+  root.append(queueBox, queuePill);
+
+  function queueRow(track, onPlay) {
+    const go = make('button', 'amb-q-go');
+    go.type = 'button';
+    go.setAttribute('aria-label', `Play ${track.t}`);
+    const shot = make('span', 'amb-q-shot');
+    shot.appendChild(buildCover(track));
+    const text = make('span', 'amb-q-text');
+    text.appendChild(make('span', 'amb-q-title', track.t));
+    const meta = [track.c, track.len].filter(Boolean).join('  ·  ');
+    if (meta) text.appendChild(make('span', 'amb-q-meta mono', meta));
+    go.append(shot, text);
+    go.addEventListener('click', onPlay);
+    return go;
+  }
+
+  function paintQueue() {
+    const entries = upNext.queue || [];
+    const then = upNext.then || { kind: 'none', tracks: [], more: 0 };
+    const has = entries.length + then.tracks.length > 0;
+
+    queueBody.textContent = '';
+    if (has) {
+      const frag = document.createDocumentFragment();
+      if (entries.length) {
+        frag.appendChild(make('p', 'amb-q-label', 'Queued'));
+        entries.slice(0, QUEUE_ROWS).forEach((entry) => {
+          frag.appendChild(queueRow(entry.track, () => player.playQueued(entry.qid)));
+        });
+        if (entries.length > QUEUE_ROWS) frag.appendChild(make('p', 'amb-q-more', `and ${entries.length - QUEUE_ROWS} more`));
+      }
+      if (then.tracks.length) {
+        frag.appendChild(make('p', 'amb-q-label', THEN_LABEL[then.kind] || 'Next'));
+        then.tracks.slice(0, QUEUE_ROWS).forEach((track, i) => {
+          frag.appendChild(queueRow(track, () => player.playUpcoming(i)));
+        });
+        if (then.more > 0) frag.appendChild(make('p', 'amb-q-more', `and ${then.more} more after those`));
+      }
+      queueBody.appendChild(frag);
+    }
+
+    queueCount.textContent = entries.length ? `${entries.length} queued` : '';
+    queueBox.hidden = !(has && queueOn);
+    queuePill.hidden = !(has && !queueOn);
+    root.classList.toggle('has-queue', has && queueOn);
+  }
+
+  function setQueueOn(on) {
+    queueOn = on;
+    try { localStorage.setItem(QUEUE_KEY, on ? 'on' : 'off'); } catch { /* not kept */ }
+    paintQueue();
+    // The button that was pressed has just gone: put focus on the other
+    const next = on ? queueX : queuePill;
+    try { next.focus({ preventScroll: true }); } catch { /* hidden */ }
+  }
+  queueX.addEventListener('click', () => setQueueOn(false));
+  queuePill.addEventListener('click', () => setQueueOn(true));
+
+  if (typeof player.onUpNext === 'function') {
+    player.onUpNext((next) => {
+      upNext = next || upNext;
+      paintQueue();
+    });
+  }
+
   /* ---------- Show and hide ---------- */
 
   function show() {
@@ -590,6 +689,10 @@ export function initAmbient({ player, frame }) {
       if (!slots[front].back.hidden) stops.push(slots[front].back);
       if (!slots[front].retry.hidden) stops.push(slots[front].retry);
       if (!slots[front].other.hidden) stops.push(slots[front].other);
+      // The Up next panel: its cross, or the button that brings it back,
+      // then the songs in it
+      if (!queueBox.hidden) stops.push(queueX, ...queueBox.querySelectorAll('.amb-q-go'));
+      if (!queuePill.hidden) stops.push(queuePill);
       const at = stops.indexOf(document.activeElement);
       const step = event.shiftKey ? stops.length - 1 : 1;
       try { stops[(at + step) % stops.length].focus({ preventScroll: true }); } catch { /* fine */ }

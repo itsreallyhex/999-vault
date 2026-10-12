@@ -202,8 +202,109 @@
 /* A tall or narrow window: stack the cover over the words */
 @media (max-width: 760px), (max-aspect-ratio: 1 / 1) {
   .amb-front { flex-direction: column; text-align: center; gap: 1.6rem; }
-  .amb-art { width: min(52vw, 40vh, 420px); }
-  .amb-text { justify-items: center; }
+  .amb-art { width: min(54vw, 34vh, 480px); }
+  .amb-text { justify-items: center; max-width: min(44rem, 86vw); }
+
+  /* The sizes above follow the window's width and stop small, which on a
+     portrait monitor leaves the words tiny under a big cover. Here the
+     width is the long side, so they take a little more of it. */
+  .amb-title { font-size: clamp(1.8rem, 4.6vw, 3.2rem); }
+  .amb-sub { font-size: var(--step--1); }
+  .amb-lyr { height: min(28vh, 22rem); }
+  .amb-lines { padding-bottom: calc(min(28vh, 22rem) / 2); }
+  .amb-lyric { font-size: clamp(1.05rem, 2.1vw, 1.65rem); }
+  .amb-retry { justify-self: center; }
+}
+
+/* ---------- Up next ----------
+   A glass panel at the right, vertically centred, with the same lists
+   the Up next sheet has. While it is up the words and cover keep clear
+   of it (.has-queue is on the root). A small button brings it back
+   after its cross has put it away. */
+.amb-queue {
+  position: absolute; z-index: 2;
+  right: clamp(1rem, 4vw, 3.5rem); top: 50%; transform: translateY(-50%);
+  width: min(340px, 34vw); max-height: min(62vh, 560px);
+  box-sizing: border-box; padding: 0.9rem 0.6rem 0.7rem;
+  display: flex; flex-direction: column; gap: 0.4rem;
+  border-radius: 18px; border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(12, 11, 16, 0.58);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+}
+.amb-queue[hidden] { display: none; }
+.amb.has-queue .amb-front { padding-right: calc(min(340px, 34vw) + clamp(1rem, 4vw, 3.5rem) + 2rem); }
+
+.amb-queue-head { display: flex; align-items: center; gap: 0.6rem; padding: 0 0.4rem 0 0.5rem; }
+.amb-queue-title { margin: 0; font-size: var(--step-0); font-weight: 600; }
+.amb-queue-count { margin-right: auto; font-size: var(--step--2); color: rgba(246, 244, 251, 0.7); }
+.amb-queue-x {
+  display: grid; place-items: center; width: 36px; height: 36px; padding: 0;
+  border: 0; border-radius: 50%; background: transparent; color: rgba(246, 244, 251, 0.8); cursor: pointer;
+  transition: background-color var(--dur) var(--ease);
+}
+.amb-queue-x:hover { background: rgba(255, 255, 255, 0.1); }
+.amb-queue-x svg { width: 16px; height: 16px; }
+.amb-queue-x:focus-visible, .amb-queue-pill:focus-visible, .amb-q-go:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.amb-queue-body { min-height: 0; overflow-y: auto; scrollbar-width: thin; display: grid; gap: 2px; align-content: start; }
+.amb-q-label {
+  margin: 0.6rem 0.5rem 0.2rem;
+  font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+  font-size: var(--step--2); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(246, 244, 251, 0.62);
+}
+.amb-q-label:first-child { margin-top: 0.1rem; }
+.amb-q-go {
+  display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: center; gap: 0.75rem;
+  width: 100%; margin: 0; padding: 0.3rem 0.5rem; border: 0; border-radius: 10px;
+  background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.amb-q-go:hover { background: rgba(255, 255, 255, 0.08); }
+.amb-q-shot { display: block; width: 44px; height: 44px; border-radius: 8px; overflow: hidden; background: rgba(255, 255, 255, 0.08); }
+.amb-q-shot .cover { width: 100%; height: 100%; }
+.amb-q-text { display: grid; min-width: 0; }
+.amb-q-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.amb-q-meta { font-size: var(--step--2); color: rgba(246, 244, 251, 0.62); }
+.amb-q-more { margin: 0.2rem 0.5rem; font-size: var(--step--2); color: rgba(246, 244, 251, 0.62); }
+
+.amb-queue-pill {
+  position: absolute; z-index: 2; right: clamp(1rem, 4vw, 3.5rem); bottom: 6rem;
+  height: 40px; padding: 0 1rem; border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28); background: rgba(8, 7, 12, 0.42);
+  color: rgba(246, 244, 251, 0.92); font: inherit; font-size: var(--step--1); cursor: pointer;
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.amb-queue-pill[hidden] { display: none; }
+.amb-queue-pill:hover { background: rgba(8, 7, 12, 0.66); border-color: rgba(255, 255, 255, 0.5); }
+
+@media (max-width: 760px), (max-aspect-ratio: 1 / 1) {
+  /* Too narrow for the words and the panel side by side (a tall window,
+     a portrait monitor): it lies under the words as a row of covers,
+     above the progress line, and the words keep the room above it */
+  .amb-queue {
+    right: auto; left: 50%; top: auto; bottom: 5rem;
+    transform: translateX(-50%);
+    width: min(640px, calc(100vw - 2rem)); max-height: none;
+    padding: 0.6rem 0.5rem 0.5rem;
+  }
+  .amb.has-queue .amb-front { padding-right: clamp(1.5rem, 6vw, 6rem); padding-bottom: 17rem; }
+  .amb-queue-body { display: flex; gap: 0.5rem; overflow-x: auto; overflow-y: hidden; }
+  .amb-q-label, .amb-q-meta { display: none; }
+  .amb-q-go {
+    flex: none; width: 92px; grid-template-columns: minmax(0, 1fr);
+    justify-items: center; text-align: center; gap: 0.35rem; padding: 0.3rem;
+  }
+  .amb-q-shot { width: 72px; height: 72px; }
+  .amb-q-title {
+    display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical;
+    white-space: normal; font-size: var(--step--1); line-height: 1.25;
+  }
+  .amb-q-more { flex: none; align-self: center; white-space: nowrap; }
+}
+
+/* Too short for even the row: leave the room to the words */
+@media (max-height: 640px) {
+  .amb-queue { display: none; }
+  .amb.has-queue .amb-front { padding-bottom: 5rem; }
 }
 
 /* ---------- Progress ---------- */
