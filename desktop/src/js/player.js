@@ -178,7 +178,10 @@ function srcFor(track) {
  * The archive's own stream for a track, for when there is no file here.
  *
  * `/music/stream/<id>` is a plain, stable, unsigned URL: 206 on a Range
- * request, CORS reflects the origin, no token, no cookie, and a request
+ * request, no token, no cookie, and no CORS header (checked on 12 Oct
+ * 2026: /music/list sends `access-control-allow-origin: *` and the
+ * stream does not, so the sound lab's reverb and EQ cannot run on a
+ * streamed song, only on one saved to disk). A request
  * to it leaves the download allowance untouched, which is what makes it
  * the right endpoint for playback and the wrong one for the archiver.
  * `/music/download/` is the metered one, at 500 a day anonymous, and it
@@ -1234,7 +1237,7 @@ async function engageFx(url) {
     return false;
   }
   if (!(await corsReadable(url))) {
-    lab.blocked = 'The app is not allowed to process this audio, so reverb and the equalizer are off. Speed and pitch still work.';
+    lab.blocked = 'Streamed songs cannot be processed, so reverb, bass and the equalizer are off. Save the song with the arrow on the bar to use them. Speed and pitch still work.';
     return false;
   }
   if (!lab.fx.ensure()) {

@@ -325,6 +325,12 @@ body.shell.has-player.has-tray .shell-frame {
   text-align: center; font-size: var(--step--2); color: var(--faint);
 }
 
+.pop-lab .pop-title { white-space: nowrap; }
+/* Narrow: ten labels no longer fit side by side, so every other one goes */
+@media (max-width: 1100px) {
+  .lab-freqs span:nth-child(even) { visibility: hidden; }
+}
+
 .lab-col-knobs { display: flex; flex-direction: column; gap: 0.9rem; }
 .lab-knobs { display: flex; justify-content: space-between; }
 .lab-knob { --k: 0; width: 88px; display: flex; flex-direction: column; align-items: center; gap: 0.25rem; }
