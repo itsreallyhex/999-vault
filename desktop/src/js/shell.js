@@ -368,6 +368,64 @@ if (inTauri) {
   }, CHECK_AFTER);
 }
 
+/* ---------- The song list, checked on its own ----------
+   A few seconds after launch and every few hours after that, ask the
+   archive what it lists now (catalogue_check, the same read the
+   button on Settings makes) and say when something moved: one toast,
+   and a dot on the Settings tab until that page is opened. It only
+   reports. Nothing is written until Update my list is pressed there,
+   and a failure (offline, a damaged listing) is silent: this is a
+   courtesy, not something to nag about.
+
+   Opening Settings while the dot is up runs the check again there, so
+   what is shown, and what Update my list would write, is fresh. On a
+   switch in Settings, `catalogue_auto`, on by default. */
+
+const SONGS_FIRST = 9000;
+const SONGS_EVERY = 6 * 60 * 60 * 1000;
+const settingsTab = document.querySelector('.side-tab[data-page="settings.html"]');
+let songsTold = '';
+
+async function autoCheckSongs() {
+  if (!inTauri) return null;
+  let s;
+  try { s = await invoke('settings_get'); } catch { return null; }
+  if (!s || s.catalogue_auto === false) return null;
+
+  let r;
+  try { r = await invoke('catalogue_check'); } catch { return null; }
+  if (!r || r.unchanged) return null;
+
+  const parts = [];
+  if (r.added_total) parts.push(`${r.added_total} new`);
+  if (r.edited_total) parts.push(`${r.edited_total} edited`);
+  if (r.removed_total) parts.push(`${r.removed_total} no longer listed`);
+  const summary = parts.join(', ');
+
+  window.__nine_songs = { at: Date.now(), summary };
+  if (settingsTab) settingsTab.classList.add('has-news');
+
+  // Told once per change, not once per check
+  const key = `${summary}|${r.live_count}`;
+  if (key !== songsTold) {
+    songsTold = key;
+    window.__nine_toast(`The archive changed: ${summary}. Open Settings to see what.`);
+  }
+  return summary;
+}
+
+/** Settings calls this when it opens: the dot has done its job. */
+window.__nine_songs_seen = () => {
+  window.__nine_songs = null;
+  if (settingsTab) settingsTab.classList.remove('has-news');
+};
+window.__nine_songs_check = autoCheckSongs;
+
+if (inTauri) {
+  setTimeout(autoCheckSongs, SONGS_FIRST);
+  setInterval(autoCheckSongs, SONGS_EVERY);
+}
+
 /* ---------- Live reload ----------
    watch.rs emits `pages-changed` with the files that moved, relative
    to the pages folder, when the pages come from a checkout. What to do

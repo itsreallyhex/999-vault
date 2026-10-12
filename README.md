@@ -75,8 +75,10 @@ screen or a panel.
 **Settings** covers where songs come from first (files on this machine or
 the archive), Discord, update checks, lyrics, the now playing screen,
 crossfade, checking the archive for new songs, and which folder holds your
-archive. Checking for new songs shows what is new and changes nothing
-until you press Update.
+archive. Checking for new songs shows what is new, edited or no longer
+listed, and changes nothing until you press Update. It also runs on its
+own a few seconds after the app opens and every few hours, if the switch
+is on, and says so when something moved.
 
 **Discord** shows what is playing while the app and Discord are both open:
 the title, the cover, a progress bar, and a button that opens this page.
@@ -93,7 +95,7 @@ No accounts, no analytics, no telemetry.
 
 | To | For | When |
 |---|---|---|
-| The archive's public API (`api.juicevault.xyz`) | the catalogue, covers, streaming, saving a song | when you play, browse, save or check for new songs |
+| The archive's public API (`api.juicevault.xyz`) | the catalogue, covers, streaming, saving a song | when you play, browse, save or check for new songs, which also happens a few seconds after the app opens and every few hours, if the switch is on |
 | GitHub | the update check | a few seconds after the app opens, if the switch is on |
 | LRCLIB | lyrics, sending a song title and the artist name and nothing else | only while the now playing screen is up, if the switch is on |
 | Discord, on this machine | Rich Presence, over Discord's local pipe | while the app and Discord are open, if the switch is on |

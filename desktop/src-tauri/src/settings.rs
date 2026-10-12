@@ -41,6 +41,10 @@ const IDLE_KEY: &str = "idle";
 const IDLE_SECONDS_KEY: &str = "idle_seconds";
 /// Seconds of overlap between one song and the next. 0 is off.
 const CROSSFADE_KEY: &str = "crossfade";
+/// Whether the shell asks the archive for its song list on its own, a
+/// few seconds after launch and every few hours. It only reports; the
+/// list changes when the person presses Update my list.
+const CATALOGUE_AUTO_KEY: &str = "catalogue_auto";
 const ROOT_KEY: &str = "data_root";
 
 /// Defaults, and the limits a value is held to on the way in.
@@ -65,6 +69,9 @@ pub struct Settings {
     pub idle_seconds: u32,
     /// Seconds of overlap between songs, 0 for none. Missing key means 0.
     pub crossfade: u32,
+    /// Check the archive's song list on its own and say what moved.
+    /// Missing key means yes.
+    pub catalogue_auto: bool,
     /// The version this binary is, for the Settings page to show.
     pub version: String,
     /// The archive as resolved right now, with which rule found it.
@@ -138,6 +145,14 @@ pub fn idle_seconds(app: &AppHandle) -> u32 {
     raw.clamp(IDLE_SECONDS_MIN, IDLE_SECONDS_MAX) as u32
 }
 
+/// Whether the song list is checked on its own. Missing key means yes.
+pub fn catalogue_auto_on(app: &AppHandle) -> bool {
+    let (_, doc) = document(app);
+    doc.get(CATALOGUE_AUTO_KEY)
+        .and_then(|item| item.as_bool())
+        .unwrap_or(true)
+}
+
 /// Seconds of crossfade, 0 for none. Held to 0 to 12.
 pub fn crossfade(app: &AppHandle) -> u32 {
     let (_, doc) = document(app);
@@ -158,6 +173,7 @@ fn current(app: &AppHandle) -> Settings {
         idle: idle_on(app),
         idle_seconds: idle_seconds(app),
         crossfade: crossfade(app),
+        catalogue_auto: catalogue_auto_on(app),
         version: app.package_info().version.to_string(),
         config_file: root.config_file.clone(),
         data_root_setting: data::config_str(app, ROOT_KEY).unwrap_or_default(),
@@ -204,6 +220,10 @@ pub fn settings_set(app: AppHandle, key: String, value: serde_json::Value) -> Re
         IDLE_KEY => {
             let on = value.as_bool().ok_or("idle must be true or false")?;
             doc[IDLE_KEY] = toml_edit::value(on);
+        }
+        CATALOGUE_AUTO_KEY => {
+            let on = value.as_bool().ok_or("catalogue_auto must be true or false")?;
+            doc[CATALOGUE_AUTO_KEY] = toml_edit::value(on);
         }
         IDLE_SECONDS_KEY => {
             let secs = value.as_i64().ok_or("idle_seconds must be a whole number")?;

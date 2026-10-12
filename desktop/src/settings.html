@@ -237,12 +237,25 @@
           <span class="set-icon" aria-hidden="true"><svg><use href="#i-cloud"/></svg></span>
           <div>
             <h2 class="set-name" id="hList">Song list</h2>
-            <p class="set-desc">The app keeps a saved copy of the archive's list of songs. Checking asks the archive what it has now, from the same place songs stream from, and shows what is new before anything changes. It sends nothing about you. Your saved songs and covers are never touched, and the old list is kept as a backup.</p>
+            <p class="set-desc">The app keeps a saved copy of the archive's list of songs. Checking asks the archive what it has now, from the same place songs stream from, and shows every song that is new, edited or no longer listed before anything changes. It sends nothing about you. Your saved songs and covers are never touched, and the old list is kept as a backup.</p>
           </div>
         </div>
         <div class="set-btns">
           <button class="btn btn-ghost" id="catCheck" type="button">Check for new songs</button>
         </div>
+      </div>
+      <div class="set-row set-row-sub">
+        <div class="set-group-head">
+          <div>
+            <h3 class="set-name set-name-sub" id="hCatAuto">Check on its own</h3>
+            <p class="set-desc">A few seconds after the app opens, and every few hours while it stays open, ask the archive what it lists and say so if something changed: a message, and a dot on Settings in the sidebar. It changes nothing by itself; the list updates when you press Update my list.</p>
+          </div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="catAuto" aria-labelledby="hCatAuto" checked>
+          <span class="switch-track" aria-hidden="true"><span class="switch-knob"></span></span>
+          <span class="switch-word" id="catAutoWord" data-on="On" data-off="Off">On</span>
+        </label>
       </div>
       <div class="cat-result" id="catResult" hidden>
         <p class="cat-sum" id="catSum" role="status" aria-live="polite"></p>

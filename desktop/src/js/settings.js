@@ -28,7 +28,7 @@ import { initPlayer, applySettings } from './player.js';
 const el = {};
 ['discord', 'discordWord', 'updates', 'updatesWord', 'lyrics', 'lyricsWord', 'versionLine', 'checkUpdates',
   'idle', 'idleWord', 'idleSeconds', 'crossfade',
-  'catCheck', 'catResult', 'catSum', 'catList', 'catMore', 'catApply', 'catClose',
+  'catCheck', 'catResult', 'catSum', 'catList', 'catMore', 'catApply', 'catClose', 'catAuto', 'catAutoWord',
   'rootPath', 'rootFound', 'rootBy', 'pickRoot', 'clearRoot',
   'restartNote', 'cfgPath', 'status', 'summary']
   .forEach((id) => { el[id] = document.getElementById(id); });
@@ -45,6 +45,7 @@ const DEFAULTS = {
   idle: true,
   idle_seconds: 30,
   crossfade: 0,
+  catalogue_auto: true,
   version: '',
   data_root: { path: '', source: 'not found', exists: false, catalogue: false, covers: false, audio: false, audio_index: false },
   data_root_setting: '',
@@ -125,6 +126,11 @@ function draw(s) {
   el.idleSeconds.disabled = !idle;
   pick(el.crossfade, Number.isFinite(s.crossfade) ? s.crossfade : 0);
 
+  // Older binaries do not send it: the check on its own is what they did not have, so on
+  const auto = s.catalogue_auto !== false;
+  el.catAuto.checked = auto;
+  el.catAutoWord.textContent = auto ? el.catAutoWord.dataset.on : el.catAutoWord.dataset.off;
+
   const root = s.data_root;
   ['catalogue', 'covers', 'audio'].forEach((k) => { held(k).dataset.on = String(Boolean(root[k])); });
   if (root.exists) {
@@ -173,6 +179,30 @@ async function set(key, value) {
 
 const num = (n) => Number(n).toLocaleString('en-US');
 
+/** A song as the lists show it: "Title (category)", with a second line
+    under it when there is something to say about it. */
+function songRow(title, category, sub) {
+  const li = document.createElement('li');
+  li.textContent = category ? `${title} (${category})` : title;
+  if (sub) {
+    const s = document.createElement('span');
+    s.className = 'cat-sub';
+    s.textContent = sub;
+    li.appendChild(s);
+  }
+  return li;
+}
+
+/** A heading and its rows, or nothing when there are none. */
+function section(title, rows) {
+  if (!rows.length) return;
+  const head = document.createElement('li');
+  head.className = 'cat-head';
+  head.textContent = title;
+  el.catList.appendChild(head);
+  rows.forEach((row) => el.catList.appendChild(row));
+}
+
 function drawCheck(r) {
   el.catResult.hidden = false;
   el.catList.textContent = '';
@@ -191,14 +221,19 @@ function drawCheck(r) {
   if (r.edited_total) bits.push(`${num(r.edited_total)} edited`);
   el.catSum.textContent = `The archive lists ${num(r.live_count)} songs and your list has ${num(r.saved_count)}: ${bits.join(', ')}.`;
 
-  r.added.forEach((s) => {
-    const li = document.createElement('li');
-    li.textContent = s.category ? `${s.title} (${s.category})` : s.title;
-    el.catList.appendChild(li);
-  });
-  const more = r.added_total - r.added.length;
+  // Every one that moved, in three groups. A binary older than the
+  // edited list sends none, and the count in the line above stands.
+  const edited = r.edited || [];
+  section(`New (${num(r.added_total)})`, r.added.map((s) => songRow(s.title, s.category)));
+  section(`Edited (${num(r.edited_total)})`, edited.map((e) => {
+    const said = [];
+    if (e.was) said.push(`was ${e.was}`);
+    if (e.changes && e.changes.length) said.push(`changed: ${e.changes.join(', ')}`);
+    return songRow(e.title, e.category, said.join('. '));
+  }));
+  section(`No longer listed (${num(r.removed_total)})`, r.removed.map((s) => songRow(s.title, s.category)));
+
   const notes = [];
-  if (more > 0) notes.push(`and ${num(more)} more new songs`);
   if (r.new_categories.length) {
     notes.push(`New ${r.new_categories.length === 1 ? 'category' : 'categories'}: ${r.new_categories.join(', ')}. It shows under All and gets its own filter.`);
   }
@@ -257,6 +292,7 @@ function wire() {
   el.idle.addEventListener('change', () => set('idle', el.idle.checked));
   el.idleSeconds.addEventListener('change', () => set('idle_seconds', Number(el.idleSeconds.value)));
   el.crossfade.addEventListener('change', () => set('crossfade', Number(el.crossfade.value)));
+  el.catAuto.addEventListener('change', () => set('catalogue_auto', el.catAuto.checked));
 
   // The check lives in the shell, which owns the pop-up. A newer
   // version opens it there; anything else is a line here.
@@ -304,6 +340,16 @@ async function boot() {
     // An app built before the settings existed: the page shows the
     // defaults and can be looked at, but nothing here can be saved.
     say(`This build of the app cannot save settings (${err}). Rebuild or reinstall it.`, true);
+  }
+
+  // The shell found changes on its own and put a dot on this tab: show
+  // them without a press. Asked again here, so what is on screen is what
+  // Update my list would write.
+  let news = null;
+  try { news = window.parent !== window ? window.parent.__nine_songs : null; } catch { news = null; }
+  if (news) {
+    try { window.parent.__nine_songs_seen(); } catch { /* not under the shell */ }
+    checkList();
   }
 }
 

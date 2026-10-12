@@ -250,11 +250,24 @@ body.has-player .set-toast { bottom: calc(var(--mini-h, 0px) + 1.25rem); }
 .cat-sum { margin: 0 0 0.6rem; font-size: var(--step-0); color: var(--text); }
 .cat-list {
   list-style: none; margin: 0 0 0.6rem; padding: 0;
-  max-height: 14rem; overflow-y: auto; scrollbar-width: thin;
+  max-height: 22rem; overflow-y: auto; scrollbar-width: thin;
   font-size: var(--step--1); color: var(--dim);
 }
 .cat-list li { padding: 0.2rem 0; border-top: 1px solid var(--line); }
 .cat-list li:first-child { border-top: 0; }
+/* One heading per kind of change: new, edited, no longer listed */
+.cat-list li.cat-head {
+  padding: 0.7rem 0 0.25rem; border-top: 0;
+  font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+  font-size: var(--step--2); letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint);
+}
+.cat-list li.cat-head:first-child { padding-top: 0.1rem; }
+/* What changed about an edited song, under its name */
+.cat-sub { display: block; color: var(--faint); font-size: var(--step--2); }
+
+/* The second row of a card: a setting that belongs under the first */
+.set-row-sub { margin-top: 1.1rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+.set-name-sub { margin-top: 0; font-size: var(--step-0); }
 .cat-list:empty { display: none; }
 .cat-result .set-btns { margin-top: 0.7rem; }
 

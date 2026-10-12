@@ -47,10 +47,6 @@ const USER_AGENT: &str = "999-vault";
 /// changing. Same set as sync.py's VOLATILE.
 const VOLATILE: [&str; 2] = ["cover", "play_count"];
 
-/// How many titles a report carries. The totals are always complete.
-const SHOW_ADDED: usize = 40;
-const SHOW_REMOVED: usize = 20;
-
 /// How long a check can be applied for. After this, check again.
 const HOLD_FOR: Duration = Duration::from_secs(15 * 60);
 
@@ -67,6 +63,18 @@ pub struct Brief {
     pub category: String,
 }
 
+/// One edited song: its name now, what it was called when the name is
+/// what moved, and what changed, in words a person would use.
+#[derive(Serialize, Debug, Clone, PartialEq)]
+pub struct Edit {
+    pub title: String,
+    pub category: String,
+    /// The old title when the title is one of the changes, else empty.
+    pub was: String,
+    pub changes: Vec<String>,
+}
+
+/// Every title that moved is listed: the Settings page scrolls.
 #[derive(Serialize, Debug)]
 pub struct Report {
     pub saved_count: usize,
@@ -78,6 +86,7 @@ pub struct Report {
     pub removed_total: usize,
     pub removed: Vec<Brief>,
     pub edited_total: usize,
+    pub edited: Vec<Edit>,
     /// Of the edited ones, how many changed a title or another name.
     pub retitled_total: usize,
     /// Categories in the listing that the saved copy had none of.
@@ -168,6 +177,23 @@ fn brief(v: &Value) -> Brief {
     Brief { title: text_of(v, "title"), category: text_of(v, "category") }
 }
 
+/// A record field as a person would say it. The two size fields are
+/// one change.
+fn label(field: &str) -> &str {
+    match field {
+        "title" => "title",
+        "alt_names" => "other names",
+        "category" => "category",
+        "length" => "length",
+        "file_name" => "file name",
+        "file_size" | "file_size_bytes" => "size",
+        "is_session_edit" => "session edit",
+        "archive_added_at" => "date added",
+        "artist" => "artist",
+        other => other,
+    }
+}
+
 fn report(live: &[Value], saved: &[Value], saved_at: &str) -> Report {
     let diff = compare(live, saved);
     let seen = categories(saved);
@@ -182,15 +208,41 @@ fn report(live: &[Value], saved: &[Value], saved_at: &str) -> Report {
         .filter(|(_, f)| f.iter().any(|k| k == "title" || k == "alt_names"))
         .count();
 
+    let before: HashMap<&str, &Value> = saved.iter().filter_map(|s| id_of(s).map(|i| (i, s))).collect();
+    let edited: Vec<Edit> = diff
+        .edited
+        .iter()
+        .map(|(i, fields)| {
+            let song = &live[*i];
+            let mut changes: Vec<String> = Vec::new();
+            for f in fields {
+                let word = label(f).to_string();
+                if !changes.contains(&word) {
+                    changes.push(word);
+                }
+            }
+            let was = if fields.iter().any(|f| f == "title") {
+                id_of(song)
+                    .and_then(|id| before.get(id))
+                    .map(|old| text_of(old, "title"))
+                    .unwrap_or_default()
+            } else {
+                String::new()
+            };
+            Edit { title: text_of(song, "title"), category: text_of(song, "category"), was, changes }
+        })
+        .collect();
+
     Report {
         saved_count: saved.len(),
         live_count: live.len(),
         saved_at: saved_at.to_string(),
         added_total: diff.added.len(),
-        added: diff.added.iter().take(SHOW_ADDED).map(|&i| brief(&live[i])).collect(),
+        added: diff.added.iter().map(|&i| brief(&live[i])).collect(),
         removed_total: diff.removed.len(),
-        removed: diff.removed.iter().take(SHOW_REMOVED).map(|&i| brief(&saved[i])).collect(),
+        removed: diff.removed.iter().map(|&i| brief(&saved[i])).collect(),
         edited_total: diff.edited.len(),
+        edited,
         retitled_total,
         new_categories,
         unchanged: diff.added.is_empty() && diff.removed.is_empty() && diff.edited.is_empty(),
@@ -465,6 +517,50 @@ mod tests {
         assert_eq!((r.added_total, r.removed_total, r.edited_total, r.retitled_total), (1, 1, 1, 1));
         assert_eq!(r.new_categories, vec!["freestyle".to_string()]);
         assert!(!r.unchanged);
+    }
+
+    #[test]
+    fn every_edit_is_listed_with_what_changed() {
+        let mut a_before = song("a", "Alpha", "main", 1, "c");
+        a_before["length"] = json!("3:00");
+        a_before["file_size"] = json!("5 MB");
+        a_before["file_size_bytes"] = json!(5_000_000);
+        let b_before = song("b", "Bravo", "main", 1, "c");
+        let saved = vec![a_before, b_before];
+
+        let mut a_now = song("a", "Alpha", "main", 1, "c");
+        a_now["length"] = json!("3:10");
+        a_now["file_size"] = json!("5.2 MB");
+        a_now["file_size_bytes"] = json!(5_200_000);
+        let mut b_now = song("b", "Bravo (v2)", "cut", 1, "c");
+        b_now["alt_names"] = json!(["Bravo two"]);
+        let live = vec![a_now, b_now];
+
+        let r = report(&live, &saved, "then");
+        assert_eq!(r.edited_total, 2);
+        assert_eq!(r.edited.len(), 2, "every edit is carried, not a few");
+
+        let a = &r.edited[0];
+        assert_eq!(a.title, "Alpha");
+        assert_eq!(a.was, "", "the title did not move, so there is no old one");
+        assert_eq!(a.changes.len(), 2, "the two size fields are one change");
+        assert!(a.changes.contains(&"length".to_string()) && a.changes.contains(&"size".to_string()));
+
+        let b = &r.edited[1];
+        assert_eq!(b.title, "Bravo (v2)");
+        assert_eq!(b.was, "Bravo");
+        assert!(b.changes.contains(&"title".to_string()));
+        assert!(b.changes.contains(&"category".to_string()));
+        assert!(b.changes.contains(&"other names".to_string()));
+    }
+
+    #[test]
+    fn a_long_listing_is_carried_whole() {
+        let saved: Vec<Value> = Vec::new();
+        let live: Vec<Value> = (0..300).map(|i| song(&format!("n{}", i), "New", "main", 0, "c")).collect();
+        let r = report(&live, &saved, "then");
+        assert_eq!(r.added_total, 300);
+        assert_eq!(r.added.len(), 300, "no cap on the titles shown");
     }
 
     #[test]

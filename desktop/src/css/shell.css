@@ -101,6 +101,13 @@ body.shell {
 
 .side-tab-name { min-width: 0; }
 
+/* The archive's song list has changed (js/shell.js): a dot until the
+   Settings page has been opened */
+.side-tab.has-news::after {
+  content: ""; width: 8px; height: 8px; margin-left: auto; flex: none;
+  border-radius: 50%; background: var(--accent-2);
+}
+
 /* The one link that leaves the app: the GitHub mark before the name.
    The tabs carry no icons on purpose; this is a link out, not a tab. */
 .side-tab-ico { width: 16px; height: 16px; flex: none; margin-right: 0.6rem; opacity: 0.8; }
