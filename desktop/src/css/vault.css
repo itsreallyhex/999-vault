@@ -1,0 +1,125 @@
+/* ============================================================
+   The Vault page.
+
+   vault.html only, loaded after app.css, player.css and select.css so
+   it overrides them here and nowhere else.
+
+   The page is the songs: a one line header, one toolbar (search, sort,
+   grid or list, select), the category chips, then the covers. A grid
+   card is the artwork with its time on the corner, the title under it
+   and one line of category and size. The same cards become rows when
+   #rows has .is-list; nothing is rebuilt, the stylesheet lays them out.
+   ============================================================ */
+
+/* ---------- Header ---------- */
+.vault-head {
+  display: grid; gap: 0.35rem;
+  padding-block: clamp(1.2rem, 0.9rem + 1.4vw, 2rem) 0.9rem;
+}
+.vault-head-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem 1.4rem; }
+.vault-title {
+  margin: 0; font-family: 'Righteous', sans-serif; font-weight: 400;
+  font-size: clamp(2rem, 1.5rem + 1.6vw, 2.75rem); line-height: 1.05;
+}
+
+/* ---------- Toolbar ---------- */
+.controls { padding-block: 0.75rem; }
+.controls-inner { gap: 0.7rem; }
+.tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; }
+.tools .search-row { flex: 1 1 320px; min-width: 0; }
+.tools .search { min-height: 48px; border-radius: 12px; font-size: var(--step-1); }
+.tools .select, .tools .sel-toggle { min-height: 48px; border-radius: 12px; padding-inline: 1rem; }
+
+.view-toggle {
+  display: inline-flex; gap: 4px; padding: 4px; border-radius: 12px;
+  border: 1px solid var(--line-2); background: var(--bg-2);
+}
+.view-btn {
+  width: 40px; height: 40px; display: grid; place-items: center; padding: 0;
+  border: 0; border-radius: 8px; background: transparent; color: var(--dim); cursor: pointer;
+  transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.view-btn svg { width: 18px; height: 18px; }
+.view-btn:hover { color: var(--text); }
+.view-btn[aria-pressed="true"] { background: rgba(139, 92, 246, 0.22); color: var(--text); }
+.view-btn:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 1px; }
+
+.bar { gap: 0.5rem 1rem; }
+
+/* ---------- Grid cards ---------- */
+.grid-wrap { padding-block: 1.25rem 4rem; }
+.grid { gap: 28px 20px; }
+
+.card-shot { border-radius: 12px; box-shadow: none; }
+.card-shot::after { border-radius: 12px; }
+
+/* The category is a dot in the line under the title now, not a badge
+   over the artwork; the time sits in the bottom corner. */
+.card-badge { display: none; }
+.card-len {
+  top: auto; bottom: 0.5rem; right: 0.5rem;
+  padding: 2px 7px; border-radius: 6px; color: var(--text); font-size: 0.68rem;
+}
+
+.card-body { padding: 0.65rem 0.1rem 0; }
+.card-title { font-weight: 600; }
+.card-meta {
+  display: flex; align-items: center; gap: 0.4rem; margin-top: 0.2rem;
+  font-family: 'JetBrains Mono', monospace; font-size: var(--step--1); color: var(--dim);
+}
+.card-cat { display: inline-flex; align-items: center; gap: 0.4rem; }
+.card-cat .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--swatch, var(--accent)); flex: none; }
+.card-time { display: none; }
+.card-size { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-size::before { content: "\00B7"; margin-right: 0.4rem; }
+
+/* ---------- List ----------
+   One row a song: cover, title, category, time, size, then the three
+   buttons that float over the artwork in the grid, now plain. */
+.grid.is-list { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+.grid.is-list .cell {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center; column-gap: 2px; border-radius: 10px;
+}
+.grid.is-list .cell:hover { background: rgba(255, 255, 255, 0.05); }
+
+.grid.is-list .card {
+  container-type: normal;
+  display: grid; grid-template-columns: 48px minmax(0, 1fr) 150px 72px 100px;
+  align-items: center; column-gap: 0.9rem;
+  padding: 4px 8px; border-radius: 10px;
+}
+/* The cover's marks size themselves against the nearest container, so
+   it is the small cover that is one here, not the whole row */
+.grid.is-list .card-shot { width: 48px; height: 48px; container-type: inline-size; border-radius: 8px; }
+.grid.is-list .card-shot::after { border-radius: 8px; }
+.grid.is-list .card-len,
+.grid.is-list .shot-veil { display: none; }
+.grid.is-list .card-now {
+  left: 50%; bottom: 50%; transform: translate(-50%, 50%); padding: 0.25rem 0.35rem;
+}
+
+.grid.is-list .card-body,
+.grid.is-list .card-meta { display: contents; }
+.grid.is-list .card-title { -webkit-line-clamp: 1; line-clamp: 1; }
+.grid.is-list .card-cat,
+.grid.is-list .card-time,
+.grid.is-list .card-size {
+  display: flex; font-family: 'JetBrains Mono', monospace; font-size: var(--step--1); color: var(--dim);
+}
+.grid.is-list .card-size::before { content: none; }
+
+.grid.is-list .card-play,
+.grid.is-list .card-add,
+.grid.is-list .card-queue,
+.grid.is-list .cell:hover .card-play,
+.grid.is-list .cell.is-current .card-play {
+  position: static; opacity: 1; pointer-events: auto; transform: none;
+  width: 40px; height: 40px; margin: 0;
+}
+
+@media (max-width: 700px) {
+  .grid.is-list .card { grid-template-columns: 48px minmax(0, 1fr) auto; }
+  .grid.is-list .card-cat,
+  .grid.is-list .card-time { display: none; }
+}

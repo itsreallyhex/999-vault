@@ -343,10 +343,20 @@ function buildCard(track, onOpen, onAdd, onPlay, onQueue) {
   shot.appendChild(veil);
   btn.appendChild(shot);
 
+  // The line under the title: category, time, size. A grid card shows
+  // the category and the size (the time is on the artwork); the list view
+  // lays the three out as columns. See css/vault.css.
   const body = make('span', 'card-body');
   body.appendChild(make('span', 'card-title', track.t));
-  body.appendChild(make('span', 'card-sub',
+  const meta = make('span', 'card-meta');
+  const cat = make('span', 'card-cat');
+  cat.appendChild(make('span', 'dot'));
+  cat.appendChild(document.createTextNode(track.c));
+  meta.appendChild(cat);
+  meta.appendChild(make('span', 'card-time', track.len || ''));
+  meta.appendChild(make('span', 'card-size',
     track.se ? `Session edit · ${track.sz}` : track.sz));
+  body.appendChild(meta);
   btn.appendChild(body);
 
   // One click opens the panel, two play the track. The first click is

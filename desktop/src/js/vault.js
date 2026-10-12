@@ -11,7 +11,7 @@ import { seconds, bytes, group, debounce, niceDate } from './utils.js';
 import { fetchCatalogue } from './api.js';
 import { buildAssignments } from './covers.js';
 import {
-  el, setSource, renderHero, renderStrip, renderChips,
+  el, setSource, renderChips,
   renderSkeleton, renderGrid, renderCount
 } from './ui.js';
 import {
@@ -208,6 +208,32 @@ el.sortSelect.addEventListener('change', () => {
   draw(true);
 });
 
+/* Grid or list. Only a class on the grid: the cards are the same, and
+   the stylesheet lays them out as rows. Kept as a per-person
+   convenience, so a missing store just means it opens as a grid. */
+const VIEW_KEY = '999:vault-view';
+const viewGrid = document.getElementById('viewGrid');
+const viewList = document.getElementById('viewList');
+
+function setView(view) {
+  const list = view === 'list';
+  el.rows.classList.toggle('is-list', list);
+  if (viewGrid) viewGrid.setAttribute('aria-pressed', String(!list));
+  if (viewList) viewList.setAttribute('aria-pressed', String(list));
+}
+
+let savedView = 'grid';
+try { savedView = localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid'; } catch { /* no store */ }
+setView(savedView);
+
+[[viewGrid, 'grid'], [viewList, 'list']].forEach(([button, view]) => {
+  if (!button) return;
+  button.addEventListener('click', () => {
+    setView(view);
+    try { localStorage.setItem(VIEW_KEY, view); } catch { /* not kept */ }
+  });
+});
+
 /* The picker is opened from a card and from inside the lightbox */
 setAddHandler(openPicker);
 setPlayHandler(playTrack);
@@ -295,8 +321,6 @@ async function boot() {
   initPlayer();
 
   setSource(sourceState, sourceText);
-  renderHero(data);
-  renderStrip(data);
   renderChips(data, state, selectCategory);
   draw(true);
   openFromUrl();

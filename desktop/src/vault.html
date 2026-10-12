@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/player.css">
   <link rel="stylesheet" href="css/select.css">
+  <link rel="stylesheet" href="css/vault.css">
 </head>
 <body>
   <a class="skip-link" href="#grid">Skip to the archive</a>
@@ -34,42 +35,22 @@
     </symbol>
   </svg>
 
-  <!-- ==================== HERO ==================== -->
-  <header class="hero wrap">
-    <div class="hero-bento">
-      <section class="hero-card">
-        <div>
-          <p class="label">Unofficial fan archive &middot; interface study</p>
-          <h1 class="hero-title">The Vault</h1>
-          <p class="hero-lede">
-            Every version, every alternate title, every session edit. The catalogue
-            of what exists, laid out so you can actually find something in it.
-          </p>
-        </div>
-
-        <div class="hero-actions">
-          <a class="btn btn-primary" href="#search">
-            Search the archive
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-          </a>
-          <a class="btn btn-ghost" href="index.html#covers">How the covers work</a>
-        </div>
-
-        <p class="source" id="source"><span class="src-dot" aria-hidden="true"></span><span id="sourceText">Connecting to the archive</span></p>
-      </section>
-
-      <dl class="hero-figs" id="heroFigs"></dl>
+  <!-- ==================== HEADER ====================
+       The page is the songs, so the header is one line: the name, and
+       where the list came from. The lede, the figures and the drifting
+       strip it replaces were all above the first song. -->
+  <header class="vault-head wrap">
+    <p class="label">Unofficial fan archive &middot; interface study</p>
+    <div class="vault-head-row">
+      <h1 class="vault-title">The Vault</h1>
+      <p class="source" id="source"><span class="src-dot" aria-hidden="true"></span><span id="sourceText">Connecting to the archive</span></p>
     </div>
   </header>
-
-  <!-- Full-bleed drifting strip of covers; decorative, so hidden from AT -->
-  <div class="hero-strip" aria-hidden="true">
-    <div class="strip-track" id="stripTrack"></div>
-  </div>
 
   <!-- ==================== CONTROLS ==================== -->
   <section class="controls" aria-label="Search and filter">
     <div class="controls-inner wrap">
+      <div class="tools">
       <div class="search-row" id="searchRow">
         <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
           <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
@@ -85,9 +66,6 @@
         </button>
       </div>
 
-      <div class="bar">
-        <div class="chips" id="chips" role="group" aria-label="Filter by category"></div>
-        <p class="count" id="count" role="status" aria-live="polite"></p>
         <label class="sr-only" for="sortSelect">Sort</label>
         <select class="select" id="sortSelect">
           <option value="plays-desc">Most played</option>
@@ -97,6 +75,24 @@
           <option value="length-desc">Longest</option>
           <option value="length-asc">Shortest</option>
         </select>
+
+        <!-- Grid or list. The Select button (js/select.js) is added after
+             this, since it goes in the sort box's parent. -->
+        <div class="view-toggle" role="group" aria-label="View">
+          <button class="view-btn" id="viewGrid" type="button" aria-pressed="true">
+            <span class="sr-only">Grid view</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></svg>
+          </button>
+          <button class="view-btn" id="viewList" type="button" aria-pressed="false">
+            <span class="sr-only">List view</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="bar">
+        <div class="chips" id="chips" role="group" aria-label="Filter by category"></div>
+        <p class="count" id="count" role="status" aria-live="polite"></p>
       </div>
     </div>
   </section>
