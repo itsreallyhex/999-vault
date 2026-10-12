@@ -29,6 +29,7 @@ import { initAmbient } from './ambient.js';
 import { initHotkeys } from './hotkeys.js';
 import { initQueuePanel } from './queue-panel.js';
 import { initLabPanel } from './lab-panel.js';
+import { initTray } from './tray.js';
 import { invoke, inTauri } from './tauri.js';
 
 window.__nine_player = player;
@@ -211,6 +212,10 @@ window.__nine_panels = {
   ...initLabPanel({ player, frame })
 };
 
+/* The strip of covers over the bar, and its button for the Up next
+   sheet above. See js/tray.js. */
+window.__nine_tray = initTray({ player });
+
 /* ---------- New release ----------
    update.rs does the checking, downloading and installing through
    Tauri's updater plugin; this is the pop-up and the two decisions
@@ -381,7 +386,7 @@ if (inTauri) {
 
 const SHELL_FILES = new Set([
   'shell.html', 'js/shell.js', 'js/player.js', 'js/ambient.js', 'js/hotkeys.js', 'js/lyrics.js',
-  'js/fx.js', 'js/popover.js', 'js/queue-panel.js', 'js/lab-panel.js',
+  'js/fx.js', 'js/popover.js', 'js/queue-panel.js', 'js/lab-panel.js', 'js/tray.js',
   // player.js imports, any of which changes the player's behaviour
   'js/config.js', 'js/tauri.js', 'js/utils.js', 'js/covers.js', 'js/ui.js', 'js/db.js',
   'js/picker.js'

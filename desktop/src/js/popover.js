@@ -67,6 +67,14 @@ export function makePopover({ id, title, frame = null, wide = false }) {
 
   let anchor = null;
 
+  /** Tell anyone who shows this panel's state (the Up next tray's button
+      says "Open queue" or "Close queue") that it opened or closed. */
+  function announce(open) {
+    try {
+      document.dispatchEvent(new CustomEvent('nine:popover', { detail: { id, open } }));
+    } catch { /* no CustomEvent: nothing is listening either */ }
+  }
+
   const api = {
     el: root,
     body,
@@ -78,11 +86,13 @@ export function makePopover({ id, title, frame = null, wide = false }) {
       anchor = from || null;
       root.hidden = false;
       if (anchor) anchor.setAttribute('aria-expanded', 'true');
+      announce(true);
     },
 
     close(giveFocusBack = true) {
       if (root.hidden) return;
       root.hidden = true;
+      announce(false);
       if (anchor) {
         anchor.setAttribute('aria-expanded', 'false');
         if (giveFocusBack && anchor.isConnected && typeof anchor.focus === 'function') {
@@ -116,6 +126,9 @@ export function makePopover({ id, title, frame = null, wide = false }) {
     if (t && t.nodeType === 1) {
       if (root.contains(t)) return;
       if (anchor && anchor.contains(t)) return;
+      // A second button for this panel (the Up next tray's): its own click
+      // toggles, so closing here first would reopen it
+      if (t.closest && t.closest(`[data-pop-toggle="${id}"]`)) return;
     }
     api.close(false);
   };

@@ -26,7 +26,7 @@
 .pop {
   position: fixed; z-index: 60;
   right: 0.75rem;
-  bottom: calc(var(--bar-h, var(--mini-h, 84px)) + 0.6rem);
+  bottom: calc(var(--bar-h, var(--mini-h, 84px)) + var(--tray-now, 0px) + 0.6rem);
   width: min(380px, calc(100vw - 1.5rem));
   max-height: min(72vh, 640px);
   display: flex; flex-direction: column;
@@ -170,7 +170,217 @@
 .sleep-hint { flex: 1 1 12rem; font-size: var(--step--2); line-height: 1.4; }
 .sleep-off[hidden] { display: none; }
 
+/* ---------- The Up next tray ----------
+   A strip of covers over the bar, from the sidebar's edge to the right.
+   js/tray.js shows it only while something is coming and puts .has-tray
+   on body, which the frame and the panels above the bar read. */
+body.shell { --tray-h: 84px; }
+body.shell.has-tray { --tray-now: var(--tray-h); }
+body.shell.has-player.has-tray .shell-frame {
+  margin-bottom: calc(var(--bar-h, var(--mini-h)) + var(--tray-h) + 0.5rem);
+}
+
+.tray {
+  position: fixed; z-index: 55;
+  left: var(--side-w, 224px); right: 0;
+  bottom: var(--bar-h, var(--mini-h, 84px));
+  height: var(--tray-h); box-sizing: border-box;
+  display: flex; align-items: center; gap: 0.9rem;
+  padding: 0 1.1rem;
+  background: var(--bg-2); border-top: 1px solid var(--line-2);
+  color: var(--text);
+}
+.tray[hidden] { display: none; }
+.tray-label { flex: none; font-weight: 600; }
+.tray-count, .tray-more { flex: none; color: var(--dim); font-size: var(--step--1); white-space: nowrap; }
+.tray-more[hidden] { display: none; }
+.tray-strip {
+  flex: 1 1 auto; min-width: 0; margin: 0; padding: 0; list-style: none;
+  display: flex; gap: 0.6rem; overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, #000 90%, transparent);
+  mask-image: linear-gradient(90deg, #000 90%, transparent);
+}
+.tray-item { flex: none; }
+.tray-go {
+  position: relative; display: block; width: 54px; height: 54px; padding: 0;
+  border: 0; border-radius: 8px; background: transparent; cursor: pointer;
+}
+.tray-go:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+.tray-shot { display: block; width: 100%; height: 100%; border-radius: 8px; overflow: hidden; background: var(--bg-3); }
+.tray-shot .cover { width: 100%; height: 100%; }
+.tray-item:not(.is-queued) .tray-shot { opacity: 0.6; }
+.tray-go:hover .tray-shot { opacity: 1; }
+.tray-n {
+  position: absolute; left: 3px; top: 3px;
+  min-width: 18px; height: 18px; padding: 0 4px;
+  display: grid; place-items: center; border-radius: 6px;
+  background: var(--accent); color: #fff; font-size: 0.62rem; line-height: 1;
+}
+.tray-toggle {
+  flex: none; display: inline-flex; align-items: center; gap: 0.5rem;
+  height: 44px; padding: 0 1rem; border-radius: 12px;
+  border: 1px solid var(--line-2); background: var(--bg-3); color: var(--text);
+  font: inherit; font-weight: 500; cursor: pointer;
+  transition: border-color var(--dur) var(--ease);
+}
+.tray-toggle:hover { border-color: var(--accent-2); }
+.tray-toggle:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+.tray-toggle svg { width: 16px; height: 16px; transition: transform var(--dur) var(--ease); }
+.tray-toggle.is-open svg { transform: rotate(180deg); }
+
+/* ---------- The sheets ----------
+   Up next and the sound lab run the width of the page, from the
+   sidebar's edge, standing on the bar (or on the tray when it is up),
+   instead of floating at the right. Each has its columns in the body. */
+.pop-queue, .pop-lab {
+  left: var(--side-w, 224px); right: 0; width: auto;
+  bottom: calc(var(--bar-h, var(--mini-h, 84px)) + var(--tray-now, 0px));
+  max-height: min(64vh, 480px);
+  border-radius: 16px 16px 0 0; border-width: 1px 0 0;
+}
+.pop-queue .pop-foot { display: none; }
+
+/* Up next: what is playing, what was asked for, what follows */
+.pop-queue .pop-body {
+  display: grid; grid-template-columns: 300px minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr); gap: 1.6rem; overflow: hidden;
+}
+.pop-queue .q-col, .pop-queue .q-then { min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+.pop-queue .q-then { margin-top: 0; }
+.pop-queue .q-now { flex-direction: column; align-items: flex-start; margin: 0; gap: 0.7rem; }
+.pop-queue .q-now-text { width: 100%; }
+.pop-queue .q-shot-lg { width: min(220px, 100%); height: auto; aspect-ratio: 1; border-radius: 14px; }
+.pop-queue .q-now-title { font-size: var(--step-1); }
+.q-head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.35rem; }
+.q-head .q-label { margin: 0; }
+.q-head .q-count { margin-right: auto; font-size: var(--step--1); }
+.q-now-bar {
+  display: flex; align-items: center; gap: 0.6rem; margin-top: 0.6rem;
+  font-size: var(--step--2); color: var(--dim);
+}
+.q-now-line { flex: 1 1 auto; height: 3px; border-radius: 3px; background: rgba(255, 255, 255, 0.14); overflow: hidden; }
+.q-now-line i { display: block; height: 100%; width: 0; background: var(--accent-2); }
+
+/* Sound lab: presets, the curve, the knobs */
+.lab-tools { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 0.75rem; }
+.pop-lab .lab-note {
+  margin: 0; flex: 1 1 auto; min-width: 0; text-align: right;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.lab-scope {
+  flex: none; display: inline-flex; gap: 3px; padding: 3px; border-radius: 12px;
+  background: rgba(0, 0, 0, 0.28); border: 1px solid var(--line);
+}
+.lab-scope-btn {
+  border: 0; border-radius: 9px; padding: 0.35rem 0.9rem; background: transparent;
+  color: var(--dim); font: inherit; font-size: var(--step--1); cursor: pointer;
+}
+.lab-scope-btn[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 32%, transparent); color: var(--text); }
+.lab-scope-btn:disabled { opacity: 0.5; cursor: default; }
+.lab-scope-btn:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 1px; }
+
+.pop-lab .pop-body {
+  display: grid; grid-template-columns: 220px minmax(0, 1fr) 300px; gap: 1.8rem;
+  align-content: start;
+}
+.pop-lab .pop-foot { display: none; }
+.lab-col { min-width: 0; }
+.lab-col-presets .lab-sub, .lab-col-eq .lab-sub { margin-top: 0; }
+
+.pop-lab .lab-presets { flex-direction: column; flex-wrap: nowrap; gap: 0.15rem; margin: 0; }
+.pop-lab .lab-presets .lab-chip { text-align: left; border-radius: 10px; border-color: transparent; padding: 0.5rem 0.8rem; }
+.pop-lab .lab-presets .lab-chip:hover:not(:disabled) { background: rgba(255, 255, 255, 0.06); border-color: transparent; }
+.pop-lab .lab-presets .lab-chip[aria-pressed="true"] { font-weight: 600; }
+
+.lab-eq-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+.lab-eq-hint { font-size: var(--step--2); color: var(--faint); }
+.lab-eq { margin: 0.2rem 0 0 2.6rem; }
+.lab-plot { position: relative; height: clamp(150px, 26vh, 190px); touch-action: none; cursor: ns-resize; }
+.lab-grid { position: absolute; left: 0; right: 0; height: 1px; background: rgba(255, 255, 255, 0.08); }
+.lab-grid.is-zero { background: rgba(255, 255, 255, 0.28); }
+.lab-grid-label {
+  position: absolute; right: calc(100% + 0.5rem); transform: translateY(-50%);
+  font-size: var(--step--2); color: var(--faint);
+}
+.lab-curve { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.lab-curve-fill { fill: color-mix(in srgb, var(--accent) 22%, transparent); stroke: none; }
+.lab-curve-line { fill: none; stroke: var(--accent-2); stroke-width: 3; stroke-linecap: round; }
+.lab-pt, .lab-pt.lab-band { position: absolute; width: 0; height: 0; margin: 0; }
+.lab-pt-dot {
+  position: absolute; left: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+  transition: transform var(--dur) var(--ease);
+}
+.lab-pt:hover .lab-pt-dot, .lab-pt.is-drag .lab-pt-dot { transform: scale(1.15); }
+.lab-pt-input:focus-visible + .lab-pt-dot { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+.lab-pt-val {
+  position: absolute; left: 0; bottom: 14px; transform: translateX(-50%);
+  padding: 2px 6px; border-radius: 6px; background: var(--bg-3); border: 1px solid var(--line-2);
+  font-size: var(--step--2); white-space: nowrap; opacity: 0; pointer-events: none;
+}
+.lab-pt:hover .lab-pt-val, .lab-pt.is-drag .lab-pt-val, .lab-pt:focus-within .lab-pt-val { opacity: 1; }
+.lab-pt.is-disabled .lab-pt-dot { opacity: 0.4; }
+.lab-freqs {
+  display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); margin-top: 0.5rem;
+  text-align: center; font-size: var(--step--2); color: var(--faint);
+}
+
+.lab-col-knobs { display: flex; flex-direction: column; gap: 0.9rem; }
+.lab-knobs { display: flex; justify-content: space-between; }
+.lab-knob { --k: 0; width: 88px; display: flex; flex-direction: column; align-items: center; gap: 0.25rem; }
+.lab-knob-ring {
+  position: relative; width: 76px; height: 76px; border-radius: 50%;
+  cursor: ns-resize; touch-action: none;
+  background: conic-gradient(from -135deg,
+    var(--accent-2) 0deg calc(var(--k) * 270deg),
+    rgba(255, 255, 255, 0.14) calc(var(--k) * 270deg) 270deg,
+    transparent 270deg 360deg);
+}
+.lab-knob-dial {
+  position: absolute; inset: 9px; border-radius: 50%;
+  background: var(--bg-3); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  transform: rotate(calc(-135deg + var(--k) * 270deg));
+}
+.lab-knob-mark { position: absolute; left: 50%; top: 5px; width: 4px; height: 14px; margin-left: -2px; border-radius: 2px; background: #fff; }
+.lab-knob:has(.lab-knob-input:focus-visible) .lab-knob-ring { outline: 2px solid var(--accent-2); outline-offset: 3px; }
+.lab-knob.is-disabled { opacity: 0.45; }
+.lab-knob.is-disabled .lab-knob-ring { cursor: default; }
+.lab-knob .lab-val { font-size: var(--step-0); color: var(--text); }
+.lab-knob .lab-name { font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; font-size: var(--step--2); letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+
+.lab-switch { margin: 0; align-items: center; }
+.lab-switch input {
+  -webkit-appearance: none; appearance: none;
+  position: relative; flex: none; width: 44px; height: 26px; margin: 0;
+  border-radius: 999px; background: rgba(255, 255, 255, 0.18); cursor: pointer;
+  transition: background-color var(--dur) var(--ease);
+}
+.lab-switch input::after {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px;
+  border-radius: 50%; background: #fff; transition: transform var(--dur) var(--ease);
+}
+.lab-switch input:checked { background: var(--accent); }
+.lab-switch input:checked::after { transform: translateX(18px); }
+.lab-switch input:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+.lab-switch span { color: var(--text); font-size: var(--step--1); }
+
+.pop-lab .lab-rooms {
+  margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; padding: 3px;
+  border-radius: 12px; background: rgba(0, 0, 0, 0.28);
+}
+.pop-lab .lab-rooms .lab-chip { border: 0; border-radius: 9px; text-align: center; padding: 0.4rem 0.2rem; }
+.pop-lab .lab-rooms .lab-chip[aria-pressed="true"] { background: rgba(255, 255, 255, 0.12); color: var(--text); }
+.pop-lab .lab-fade { flex-basis: auto; }
+
+@media (max-width: 980px) {
+  .pop-queue .pop-body, .pop-lab .pop-body { grid-template-columns: 1fr; overflow-y: auto; }
+  .pop-queue, .pop-lab { max-height: 70vh; }
+}
+
 @media (max-width: 480px) {
   .pop, .pop-wide { right: 0.5rem; width: calc(100vw - 1rem); }
-  .lab-eq-grid { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tray-toggle svg, .lab-pt-dot, .lab-switch input, .lab-switch input::after { transition: none; }
 }

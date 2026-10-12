@@ -50,7 +50,9 @@ arrow on the bar saves it to your archive folder, through the archive's
 metered download, so the next play comes off disk.
 
 **Up next** is a queue you can see. Add one song or many, take songs out,
-and queue the same song more than once.
+and queue the same song more than once. A strip of covers above the bar
+shows what is coming, and one press opens the full list. The now playing
+screen carries the same list at its side.
 
 **The now playing screen** shows the cover large over a blurred copy of
 itself, with the title, a progress line and the lyrics. It comes up after

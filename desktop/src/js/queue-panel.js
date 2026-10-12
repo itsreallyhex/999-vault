@@ -71,7 +71,15 @@ export function initQueuePanel({ player, frame }) {
   const nowLabel = make('p', 'q-label', 'Now playing');
   const nowTitle = make('p', 'q-now-title', 'Nothing is playing');
   const nowMeta = make('p', 'q-meta');
-  nowText.append(nowLabel, nowTitle, nowMeta);
+  // How far into it: moved twice a second while the panel is open
+  const nowBar = make('div', 'q-now-bar mono');
+  const nowAt = make('span', '', '0:00');
+  const nowLine = make('span', 'q-now-line');
+  const nowFill = make('i');
+  nowLine.appendChild(nowFill);
+  const nowTotal = make('span', '', '0:00');
+  nowBar.append(nowAt, nowLine, nowTotal);
+  nowText.append(nowLabel, nowTitle, nowMeta, nowBar);
   now.append(nowShot, nowText);
 
   /* ---- what was asked for ---- */
@@ -87,12 +95,16 @@ export function initQueuePanel({ player, frame }) {
   const thenMore = make('p', 'q-more', '');
   thenWrap.append(thenLabel, thenList, thenMore);
 
-  pop.body.append(now, queueLabel, list, empty, thenWrap);
-
+  // Three columns: what is playing, what was asked for, what follows.
+  // The clear button and the count sit with the queue they belong to.
   const clear = make('button', 'btn btn-ghost q-clear', 'Clear queue');
   clear.type = 'button';
   const count = make('span', 'q-count mono', '');
-  pop.foot.append(count, clear);
+  const queueHead = make('div', 'q-head');
+  queueHead.append(queueLabel, count, clear);
+  const queueCol = make('div', 'q-col');
+  queueCol.append(queueHead, list, empty);
+  pop.body.append(now, queueCol, thenWrap);
 
   clear.addEventListener('click', () => player.clearQueue());
 
@@ -189,6 +201,29 @@ export function initQueuePanel({ player, frame }) {
 
   player.onUpNext(render);
   player.onPlayback(renderNow);
+
+  /* The progress line under the title. The player says nothing about it
+     between plays, so it is read while the panel is open and not at all
+     when it is shut. */
+  const clock = (sec) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+  function paintBar() {
+    const t = typeof player.timing === 'function' ? player.timing() : null;
+    if (!t) return;
+    nowAt.textContent = clock(t.at || 0);
+    nowTotal.textContent = t.total > 0 ? clock(t.total) : '';
+    nowFill.style.width = t.total > 0 ? `${Math.min(100, (t.at / t.total) * 100)}%` : '0%';
+  }
+  let tick = null;
+  document.addEventListener('nine:popover', (event) => {
+    const d = event.detail || {};
+    if (d.id !== 'queuePanel') return;
+    clearInterval(tick);
+    tick = null;
+    if (d.open) {
+      paintBar();
+      tick = setInterval(paintBar, 500);
+    }
+  });
 
   document.addEventListener('nine:open-queue', (event) => {
     const anchor = event.detail && event.detail.anchor;
