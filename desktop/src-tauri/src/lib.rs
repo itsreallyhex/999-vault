@@ -17,6 +17,7 @@ mod pages;
 mod paths;
 mod presence;
 mod settings;
+mod sync;
 mod tools;
 mod update;
 mod watch;
@@ -116,6 +117,7 @@ pub fn run() {
             settings::settings_get,
             settings::settings_set,
             settings::pick_folder,
+            sync::sync_request,
         ])
         .run(tauri::generate_context!())
         .expect("999 failed to start");

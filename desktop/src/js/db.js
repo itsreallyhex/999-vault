@@ -5,12 +5,13 @@
    the only one that touches the network. No DOM, no fetch: it is
    handed plain track objects and returns plain objects back.
 
-   Four stores:
+   Five stores:
 
      playlists  { id, name, note, created, updated }
      items      { id, playlistId, pos, added, ...track snapshot }
      recent     { id, at }
      plays      { id, rid, t, c, cov, at, sec }
+     syncMeta   { k, v }
 
    `plays` is the listening history, one row per track started: what
    it was, when, and how many seconds of it were actually heard. The
@@ -32,6 +33,24 @@
    `pos` is kept dense, 0..n-1, and rewritten whenever a row is removed
    or moved, so the order never drifts.
 
+   Sync (sync.js) adds three optional fields to playlists, items and
+   plays, and `syncMeta` for its bookkeeping:
+
+     dirty    a number, set by every change made here, cleared by sync
+              once the server has the row. Rows with no `seq` have
+              never been acknowledged and count as unsent as well.
+     seq      set by sync when the server has acknowledged the row.
+     deleted  a tombstone. Only a row the server has seen is kept as
+              one, until the next sync acknowledges the delete. A row
+              it has never seen is deleted for real, as before, so a
+              machine that never syncs never carries tombstones.
+     order    on a playlist, the song titles in the order the server
+              last had them.
+
+   Tombstones are hidden from every read in here, and from exportAll.
+   The export file stays version 3, so an old file imports and a new
+   one opens in an older app.
+
    Transaction discipline: an IndexedDB transaction closes as soon as
    the event loop turns with no request outstanding. Nothing in here
    awaits between requests. Every multi-step operation chains through
@@ -40,15 +59,19 @@
    ============================================================ */
 
 const DB_NAME = '999-vault';
-/** 2 added the `recent` store, 3 added `plays`. The upgrade only
-    creates what is missing, so a database written by an earlier
-    version keeps everything it had. */
-const DB_VERSION = 3;
+/** 2 added the `recent` store, 3 added `plays`, 4 added `syncMeta`.
+    The upgrade only creates what is missing, so a database written by
+    an earlier version keeps everything it had. */
+const DB_VERSION = 4;
+/** The file format of exportAll(). Not the database version: the file
+    did not change when the database did. */
+const EXPORT_VERSION = 3;
 
 const PLAYLISTS = 'playlists';
 const ITEMS = 'items';
 const RECENT = 'recent';
 const PLAYS = 'plays';
+const SYNCMETA = 'syncMeta';
 
 /** How many record ids the exclusion queue holds before the oldest
     falls off and becomes pickable again. */
@@ -67,11 +90,34 @@ let dbPromise = null;
 
 /** Stable id for a new row. randomUUID is missing on some browsers over
     plain http, which is exactly how this project is served. */
-function uid() {
+export function uid() {
   if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
     return globalThis.crypto.randomUUID();
   }
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/** A value for `dirty`. Two changes to one row never share one, so
+    sync can tell "unchanged since I read it" from "changed again". */
+let lastMark = 0;
+function mark() {
+  const now = Date.now();
+  lastMark = now > lastMark ? now : lastMark + 1;
+  return lastMark + Math.random() * 0.9;
+}
+
+/** Tell the shell's sync that something changed. The pages are separate
+    documents, so this is a channel, not a call. Made on first use and
+    unref'd, so a script that only imports this module can still exit. */
+let channel = null;
+function notifySync() {
+  try {
+    if (!channel && typeof BroadcastChannel === 'function') {
+      channel = new BroadcastChannel('999-sync');
+      if (typeof channel.unref === 'function') channel.unref();
+    }
+    if (channel) channel.postMessage('dirty');
+  } catch { /* no channel: sync still runs every few minutes */ }
 }
 
 /**
@@ -108,7 +154,8 @@ export function openDb() {
         items.createIndex('byPlaylist', 'playlistId');
         items.createIndex('byTitle', 't');
         // Unique, so the same title cannot land in one playlist twice.
-        // The repeat surfaces as a ConstraintError, caught in addTrack().
+        // A removed song that sync still has to report stays here as a
+        // tombstone, and adding it again revives that row.
         items.createIndex('byPlaylistTitle', ['playlistId', 't'], { unique: true });
       }
 
@@ -123,6 +170,10 @@ export function openDb() {
         const plays = db.createObjectStore(PLAYS, { keyPath: 'id' });
         plays.createIndex('byAt', 'at');
         plays.createIndex('byRid', 'rid');
+      }
+
+      if (!db.objectStoreNames.contains(SYNCMETA)) {
+        db.createObjectStore(SYNCMETA, { keyPath: 'k' });
       }
     };
 
@@ -139,14 +190,20 @@ export function openDb() {
  * Run one transaction.
  * `work` is handed the transaction and a `done` callback recording the
  * value to resolve with. The promise settles on oncomplete, so it only
- * resolves once the writes have actually landed.
+ * resolves once the writes have actually landed. A write that touched
+ * playlists, items or plays also tells sync.
  */
 function run(stores, mode, work) {
   return openDb().then((db) => new Promise((resolve, reject) => {
     const tx = db.transaction(stores, mode);
     let result;
 
-    tx.oncomplete = () => resolve(result);
+    tx.oncomplete = () => {
+      if (mode === 'readwrite' && stores.some((s) => s === PLAYLISTS || s === ITEMS || s === PLAYS)) {
+        notifySync();
+      }
+      resolve(result);
+    };
     tx.onerror = () => reject(tx.error || new Error('transaction failed'));
     tx.onabort = () => reject(tx.error || new Error('transaction aborted'));
 
@@ -177,25 +234,33 @@ function snapshot(track) {
   return out;
 }
 
-/** Bump a playlist's `updated` inside an open transaction. */
-function touch(tx, playlistId) {
+const alive = (row) => !row.deleted;
+
+/** Bump a playlist's `updated` inside an open transaction. With
+    `unsent` it is also marked for sync, which only a change to the
+    playlist itself (its order) needs: adding or removing a song is an
+    item record and leaves the playlist record alone. */
+function touch(tx, playlistId, unsent = false) {
   const store = tx.objectStore(PLAYLISTS);
   store.get(playlistId).onsuccess = (event) => {
     const row = event.target.result;
     if (!row) return;
     row.updated = Date.now();
+    if (unsent) row.dirty = mark();
     store.put(row);
   };
 }
 
 /**
  * Rewrite `pos` to 0..n-1 for one playlist, then touch it.
- * Called after any removal so gaps never accumulate.
+ * Called after any removal so gaps never accumulate. Tombstones keep
+ * -1 and take no place in the order.
  */
 function compact(tx, playlistId, done, value) {
   const store = tx.objectStore(ITEMS);
   store.index('byPlaylist').getAll(playlistId).onsuccess = (event) => {
     event.target.result
+      .filter(alive)
       .sort((a, b) => a.pos - b.pos)
       .forEach((row, i) => {
         if (row.pos !== i) {
@@ -208,24 +273,30 @@ function compact(tx, playlistId, done, value) {
   };
 }
 
+/** Delete an item row, or keep it as a tombstone when the server has
+    seen it and has to be told. */
+function dropItem(store, row) {
+  if (row.seq === undefined) store.delete(row.id);
+  else store.put({ ...row, deleted: true, pos: -1, dirty: mark() });
+}
+
 /* ---------- Playlists ---------- */
 
 /**
  * Every playlist, most recently changed first, each with its track
- * count. The count comes from one key cursor over the index rather
- * than reading the items themselves.
+ * count. The count comes from one cursor over the index.
  */
 export function listPlaylists() {
   return run([PLAYLISTS, ITEMS], 'readonly', (tx, done) => {
     tx.objectStore(PLAYLISTS).getAll().onsuccess = (event) => {
-      const rows = event.target.result;
+      const rows = event.target.result.filter(alive);
       const counts = new Map();
 
-      const cursor = tx.objectStore(ITEMS).index('byPlaylist').openKeyCursor();
+      const cursor = tx.objectStore(ITEMS).index('byPlaylist').openCursor();
       cursor.onsuccess = (ev) => {
         const c = ev.target.result;
         if (c) {
-          counts.set(c.key, (counts.get(c.key) || 0) + 1);
+          if (!c.value.deleted) counts.set(c.key, (counts.get(c.key) || 0) + 1);
           c.continue();
           return;
         }
@@ -248,7 +319,8 @@ export function createPlaylist(name, note = '') {
     name: clean.slice(0, 80),
     note: String(note).slice(0, 240),
     created: now,
-    updated: now
+    updated: now,
+    dirty: mark()
   };
 
   return run([PLAYLISTS], 'readwrite', (tx, done) => {
@@ -263,7 +335,7 @@ export function updatePlaylist(id, fields) {
     const store = tx.objectStore(PLAYLISTS);
     store.get(id).onsuccess = (event) => {
       const row = event.target.result;
-      if (!row) { done(null); return; }
+      if (!row || row.deleted) { done(null); return; }
 
       if (fields.name !== undefined) {
         const clean = String(fields.name).trim();
@@ -272,20 +344,30 @@ export function updatePlaylist(id, fields) {
       if (fields.note !== undefined) row.note = String(fields.note).slice(0, 240);
 
       row.updated = Date.now();
+      row.dirty = mark();
       store.put(row);
       done(row);
     };
   });
 }
 
-/** Delete a playlist and everything in it, in one transaction. */
+/** Delete a playlist and everything in it, in one transaction. A
+    playlist the server has seen stays as a tombstone, with its songs,
+    until the next sync reports it. */
 export function deletePlaylist(id) {
   return run([PLAYLISTS, ITEMS], 'readwrite', (tx, done) => {
     const items = tx.objectStore(ITEMS);
-    items.index('byPlaylist').getAllKeys(id).onsuccess = (event) => {
-      event.target.result.forEach((key) => items.delete(key));
-      tx.objectStore(PLAYLISTS).delete(id);
-      done(true);
+    const lists = tx.objectStore(PLAYLISTS);
+
+    lists.get(id).onsuccess = (event) => {
+      const list = event.target.result;
+
+      items.index('byPlaylist').getAll(id).onsuccess = (ev) => {
+        ev.target.result.filter(alive).forEach((row) => dropItem(items, row));
+        if (list && list.seq !== undefined) lists.put({ ...list, deleted: true, dirty: mark() });
+        else lists.delete(id);
+        done(true);
+      };
     };
   });
 }
@@ -296,7 +378,7 @@ export function deletePlaylist(id) {
 export function itemsIn(playlistId) {
   return run([ITEMS], 'readonly', (tx, done) => {
     tx.objectStore(ITEMS).index('byPlaylist').getAll(playlistId).onsuccess = (event) => {
-      done(event.target.result.sort((a, b) => a.pos - b.pos));
+      done(event.target.result.filter(alive).sort((a, b) => a.pos - b.pos));
     };
   });
 }
@@ -304,23 +386,32 @@ export function itemsIn(playlistId) {
 /**
  * Append a track to a playlist.
  * Resolves to the new item, or to null if that title is already in the
- * playlist. The unique compound index is what detects the repeat;
- * preventDefault on the error stops it aborting the transaction.
+ * playlist. A title that was removed and is still waiting to be
+ * reported comes back to life on its own row, which keeps the unique
+ * index honest.
  */
 export function addTrack(playlistId, track) {
+  const snap = snapshot(track);
+
   return run([PLAYLISTS, ITEMS], 'readwrite', (tx, done) => {
     const store = tx.objectStore(ITEMS);
 
-    store.index('byPlaylist').count(playlistId).onsuccess = (event) => {
+    store.index('byPlaylist').getAll(playlistId).onsuccess = (event) => {
+      const rows = event.target.result;
+      const have = rows.find((r) => r.t === snap.t);
+      if (have && !have.deleted) { done(null); return; }
+
+      const base = have ? { ...have } : { id: uid(), playlistId };
+      delete base.deleted;
       const row = {
-        id: uid(),
-        playlistId,
-        pos: event.target.result,
+        ...base,
+        pos: rows.filter(alive).length,
         added: Date.now(),
-        ...snapshot(track)
+        ...snap,
+        dirty: mark()
       };
 
-      const request = store.add(row);
+      const request = store.put(row);
       request.onsuccess = () => {
         touch(tx, playlistId);
         done(row);
@@ -342,8 +433,9 @@ export function removeItem(id) {
     const store = tx.objectStore(ITEMS);
     store.get(id).onsuccess = (event) => {
       const row = event.target.result;
-      if (!row) { done(false); return; }
-      store.delete(id).onsuccess = () => compact(tx, row.playlistId, done, true);
+      if (!row || row.deleted) { done(false); return; }
+      dropItem(store, row);
+      compact(tx, row.playlistId, done, true);
     };
   });
 }
@@ -352,10 +444,11 @@ export function removeItem(id) {
 export function removeTrack(playlistId, title) {
   return run([PLAYLISTS, ITEMS], 'readwrite', (tx, done) => {
     const store = tx.objectStore(ITEMS);
-    store.index('byPlaylistTitle').getKey([playlistId, title]).onsuccess = (event) => {
-      const key = event.target.result;
-      if (key === undefined) { done(false); return; }
-      store.delete(key).onsuccess = () => compact(tx, playlistId, done, true);
+    store.index('byPlaylistTitle').get([playlistId, title]).onsuccess = (event) => {
+      const row = event.target.result;
+      if (!row || row.deleted) { done(false); return; }
+      dropItem(store, row);
+      compact(tx, playlistId, done, true);
     };
   });
 }
@@ -363,13 +456,14 @@ export function removeTrack(playlistId, title) {
 /**
  * Move an item up or down by `delta` places.
  * Swaps positions with its neighbour, so every other row is untouched.
- * Resolves false at either end of the list.
+ * Resolves false at either end of the list. The order lives in the
+ * playlist record, so this marks the playlist, not the items.
  */
 export function moveItem(playlistId, itemId, delta) {
   return run([PLAYLISTS, ITEMS], 'readwrite', (tx, done) => {
     const store = tx.objectStore(ITEMS);
     store.index('byPlaylist').getAll(playlistId).onsuccess = (event) => {
-      const list = event.target.result.sort((a, b) => a.pos - b.pos);
+      const list = event.target.result.filter(alive).sort((a, b) => a.pos - b.pos);
 
       const from = list.findIndex((r) => r.id === itemId);
       const to = from + delta;
@@ -381,7 +475,7 @@ export function moveItem(playlistId, itemId, delta) {
 
       store.put(list[from]);
       store.put(list[to]);
-      touch(tx, playlistId);
+      touch(tx, playlistId, true);
       done(true);
     };
   });
@@ -391,7 +485,7 @@ export function moveItem(playlistId, itemId, delta) {
 export function membership(title) {
   return run([ITEMS], 'readonly', (tx, done) => {
     tx.objectStore(ITEMS).index('byTitle').getAll(title).onsuccess = (event) => {
-      done(event.target.result.map((r) => r.playlistId));
+      done(event.target.result.filter(alive).map((r) => r.playlistId));
     };
   });
 }
@@ -482,7 +576,8 @@ export function logPlay(track) {
     c: track.c || 'main',
     cov: track.cov || null,
     at: stamp(),
-    sec: 0
+    sec: 0,
+    dirty: mark()
   };
 
   return run([PLAYS], 'readwrite', (tx, done) => {
@@ -502,6 +597,7 @@ export function addListened(id, seconds) {
       const row = event.target.result;
       if (!row) { done(false); return; }
       row.sec = (row.sec || 0) + seconds;
+      row.dirty = mark();
       store.put(row);
       done(true);
     };
@@ -518,22 +614,50 @@ export function allPlays() {
   });
 }
 
+/**
+ * Forget the listening history up to now. Resolves to how many plays
+ * went. On a machine that has synced, the moment is also kept for the
+ * next sync to send, so the other device clears too; on one that never
+ * has, nothing is remembered, so a first sync cannot wipe a server's
+ * history over something cleared long ago.
+ */
+export function clearHistory(at = Date.now()) {
+  return run([PLAYS, SYNCMETA], 'readwrite', (tx, done) => {
+    const plays = tx.objectStore(PLAYS);
+    const meta = tx.objectStore(SYNCMETA);
+
+    plays.index('byAt').getAllKeys(IDBKeyRange.upperBound(at)).onsuccess = (event) => {
+      const keys = event.target.result;
+      keys.forEach((key) => plays.delete(key));
+
+      meta.get('server').onsuccess = (ev) => {
+        if (!ev.target.result) { done(keys.length); return; }
+        meta.get('clearPending').onsuccess = (e) => {
+          const was = e.target.result ? e.target.result.v : 0;
+          meta.put({ k: 'clearPending', v: Math.max(was, at) });
+          done(keys.length);
+        };
+      };
+    };
+  });
+}
+
 /* ---------- Backup ---------- */
 
 /**
  * Everything, as one plain object ready for JSON.stringify.
  * IndexedDB lives in one browser profile and clearing site data takes
  * it along with everything else, so an export is the only copy that
- * survives that.
+ * survives that. Tombstones are left out: they are bookkeeping.
  */
 export function exportAll() {
   return run([PLAYLISTS, ITEMS, PLAYS], 'readonly', (tx, done) => {
     tx.objectStore(PLAYLISTS).getAll().onsuccess = (event) => {
-      const playlists = event.target.result;
+      const playlists = event.target.result.filter(alive);
 
       tx.objectStore(ITEMS).getAll().onsuccess = (ev) => {
         const byList = new Map();
-        ev.target.result.forEach((item) => {
+        ev.target.result.filter(alive).forEach((item) => {
           if (!byList.has(item.playlistId)) byList.set(item.playlistId, []);
           byList.get(item.playlistId).push(item);
         });
@@ -543,7 +667,7 @@ export function exportAll() {
         tx.objectStore(PLAYS).getAll().onsuccess = (e) => {
           done({
             app: DB_NAME,
-            version: DB_VERSION,
+            version: EXPORT_VERSION,
             exported: new Date().toISOString(),
             playlists: playlists
               .sort((a, b) => a.created - b.created)
@@ -555,7 +679,9 @@ export function exportAll() {
                   .sort((a, b) => a.pos - b.pos)
                   .map((item) => ({ added: item.added, ...snapshot(item) }))
               })),
-            plays: e.target.result.sort((a, b) => a.at - b.at)
+            plays: e.target.result
+              .map(({ id, rid, t, c, cov, at, sec }) => ({ id, rid, t, c, cov, at, sec }))
+              .sort((a, b) => a.at - b.at)
           });
         };
       };
@@ -592,13 +718,14 @@ export function importAll(payload) {
         c: String(row.c || 'main'),
         cov: row.cov || null,
         at: Number(row.at),
-        sec: Number(row.sec) || 0
+        sec: Number(row.sec) || 0,
+        dirty: mark()
       });
       addedPlays++;
     });
 
     lists.getAll().onsuccess = (event) => {
-      const taken = new Set(event.target.result.map((p) => p.name));
+      const taken = new Set(event.target.result.filter(alive).map((p) => p.name));
       let addedLists = 0;
       let addedItems = 0;
 
@@ -616,7 +743,8 @@ export function importAll(payload) {
           name,
           note: String(source.note || '').slice(0, 240),
           created: Number(source.created) || now,
-          updated: now
+          updated: now,
+          dirty: mark()
         });
         addedLists++;
 
@@ -634,7 +762,8 @@ export function importAll(payload) {
             playlistId: id,
             pos: seen.size - 1,
             added: Number(row.added) || now,
-            ...snapshot(row)
+            ...snapshot(row),
+            dirty: mark()
           });
           addedItems++;
         });
@@ -643,4 +772,86 @@ export function importAll(payload) {
       done({ playlists: addedLists, items: addedItems, plays: addedPlays });
     };
   });
+}
+
+/* ---------- For sync.js ---------- */
+
+/*
+   Raw access, and nothing else. What to send and how to merge an answer
+   is sync.js's business; this module only reads every row and applies
+   a list of writes inside one transaction, so what sync decided is
+   what is stored, even with another page writing at the same moment.
+   These writes do not wake sync again.
+*/
+
+const SYNC_STORES = [PLAYLISTS, ITEMS, PLAYS, SYNCMETA];
+
+/** Every row of the three data stores, and the bookkeeping as an object. */
+function readState(tx, then) {
+  const state = {};
+  tx.objectStore(PLAYLISTS).getAll().onsuccess = (a) => {
+    state.playlists = a.target.result;
+    tx.objectStore(ITEMS).getAll().onsuccess = (b) => {
+      state.items = b.target.result;
+      tx.objectStore(PLAYS).getAll().onsuccess = (c) => {
+        state.plays = c.target.result;
+        tx.objectStore(SYNCMETA).getAll().onsuccess = (d) => {
+          state.meta = {};
+          d.target.result.forEach((row) => { state.meta[row.k] = row.v; });
+          then(state);
+        };
+      };
+    };
+  };
+}
+
+export function syncRead() {
+  return run(SYNC_STORES, 'readonly', (tx, done) => readState(tx, done));
+}
+
+/**
+ * Read everything, hand it to `decide`, and apply what it returns, all
+ * in one transaction. `decide(state)` is synchronous and returns
+ *
+ *   { put: { playlists, items, plays }, remove: { playlists, items, plays },
+ *     meta: { key: value | undefined }, result }
+ *
+ * `remove` holds primary keys and runs before `put`. A meta value of
+ * undefined deletes the key. Resolves to `result`.
+ */
+export function syncTransact(decide) {
+  return openDb().then((db) => new Promise((resolve, reject) => {
+    const tx = db.transaction(SYNC_STORES, 'readwrite');
+    let result;
+
+    tx.oncomplete = () => resolve(result);
+    tx.onerror = () => reject(tx.error || new Error('sync transaction failed'));
+    tx.onabort = () => reject(tx.error || new Error('sync transaction aborted'));
+
+    readState(tx, (state) => {
+      let ops;
+      try {
+        ops = decide(state) || {};
+      } catch (err) {
+        tx.abort();
+        reject(err);
+        return;
+      }
+
+      const stores = { playlists: PLAYLISTS, items: ITEMS, plays: PLAYS };
+      Object.entries(stores).forEach(([name, store]) => {
+        const target = tx.objectStore(store);
+        ((ops.remove && ops.remove[name]) || []).forEach((key) => target.delete(key));
+        ((ops.put && ops.put[name]) || []).forEach((row) => target.put(row));
+      });
+
+      const meta = tx.objectStore(SYNCMETA);
+      Object.entries(ops.meta || {}).forEach(([k, v]) => {
+        if (v === undefined) meta.delete(k);
+        else meta.put({ k, v });
+      });
+
+      result = ops.result;
+    });
+  }));
 }

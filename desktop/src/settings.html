@@ -268,7 +268,40 @@
       </div>
     </section>
 
-    <section class="set-group" aria-labelledby="hArchive" style="--i: 8">
+    <section class="set-group" aria-labelledby="hSync" style="--i: 8">
+      <div class="set-group-head">
+        <span class="set-icon" aria-hidden="true"><svg><use href="#i-cloud"/></svg></span>
+        <div>
+          <h2 class="set-name" id="hSync">Sync with your phone</h2>
+          <p class="set-desc">Keeps your playlists, the songs in them, their order and your listening history level with the iPhone app, through a sync server you run yourself. It is off until both an address and a token are saved. The first time, a backup of your playlists is saved where you choose before anything is sent. Saved songs, settings and audio never leave this machine, and nothing goes to anyone but that server.</p>
+        </div>
+      </div>
+      <div class="sync-fields">
+        <label class="set-sub" for="syncUrl">Server address</label>
+        <input class="set-input" id="syncUrl" type="url" placeholder="https://" autocomplete="off" spellcheck="false">
+        <label class="set-sub" for="syncToken">Token</label>
+        <input class="set-input" id="syncToken" type="password" placeholder="Paste the token" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="set-btns sync-btns">
+        <button class="btn btn-primary" id="syncSave" type="button">Save</button>
+        <button class="btn btn-ghost" id="syncNow" type="button" disabled>Sync now</button>
+        <button class="btn btn-ghost" id="syncStop" type="button" disabled>Stop syncing</button>
+      </div>
+      <p class="set-note" id="syncStatus" role="status" aria-live="polite">Sync is off</p>
+      <div class="set-row set-row-sub">
+        <div class="set-group-head">
+          <div>
+            <h3 class="set-name set-name-sub" id="hClear">Listening history</h3>
+            <p class="set-desc">Forget what has been played so far. With sync on, it clears on the other device too. Playlists are not touched.</p>
+          </div>
+        </div>
+        <div class="set-btns">
+          <button class="btn btn-ghost" id="clearHistory" type="button">Clear history</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="set-group" aria-labelledby="hArchive" style="--i: 9">
       <div class="set-row">
         <div class="set-group-head">
           <span class="set-icon" aria-hidden="true"><svg><use href="#i-folder"/></svg></span>

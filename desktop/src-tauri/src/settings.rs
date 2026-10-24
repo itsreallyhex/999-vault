@@ -45,6 +45,12 @@ const CROSSFADE_KEY: &str = "crossfade";
 /// few seconds after launch and every few hours. It only reports; the
 /// list changes when the person presses Update my list.
 const CATALOGUE_AUTO_KEY: &str = "catalogue_auto";
+/// The owner's sync server and the token it wants. Both empty, the
+/// default, means sync is off and nothing is ever sent. The token is
+/// never handed back to the page: `sync_token_set` says whether one
+/// is saved. See sync.rs.
+const SYNC_URL_KEY: &str = "sync_url";
+const SYNC_TOKEN_KEY: &str = "sync_token";
 const ROOT_KEY: &str = "data_root";
 
 /// Defaults, and the limits a value is held to on the way in.
@@ -72,6 +78,10 @@ pub struct Settings {
     /// Check the archive's song list on its own and say what moved.
     /// Missing key means yes.
     pub catalogue_auto: bool,
+    /// The sync server's address, empty when sync is off.
+    pub sync_url: String,
+    /// Whether a sync token is saved. The token itself stays in Rust.
+    pub sync_token_set: bool,
     /// The version this binary is, for the Settings page to show.
     pub version: String,
     /// The archive as resolved right now, with which rule found it.
@@ -153,6 +163,26 @@ pub fn catalogue_auto_on(app: &AppHandle) -> bool {
         .unwrap_or(true)
 }
 
+/// A string setting, trimmed, empty when missing.
+fn text_setting(app: &AppHandle, key: &str) -> String {
+    let (_, doc) = document(app);
+    doc.get(key)
+        .and_then(|item| item.as_str())
+        .map(|s| s.trim().to_string())
+        .unwrap_or_default()
+}
+
+/// The sync server and token, when both are saved and the address is
+/// one sync may use. None means sync is off.
+pub fn sync_target(app: &AppHandle) -> Option<(String, String)> {
+    let url = text_setting(app, SYNC_URL_KEY);
+    let token = text_setting(app, SYNC_TOKEN_KEY);
+    if token.is_empty() || !crate::sync::url_ok(&url) {
+        return None;
+    }
+    Some((url, token))
+}
+
 /// Seconds of crossfade, 0 for none. Held to 0 to 12.
 pub fn crossfade(app: &AppHandle) -> u32 {
     let (_, doc) = document(app);
@@ -174,6 +204,8 @@ fn current(app: &AppHandle) -> Settings {
         idle_seconds: idle_seconds(app),
         crossfade: crossfade(app),
         catalogue_auto: catalogue_auto_on(app),
+        sync_url: text_setting(app, SYNC_URL_KEY),
+        sync_token_set: !text_setting(app, SYNC_TOKEN_KEY).is_empty(),
         version: app.package_info().version.to_string(),
         config_file: root.config_file.clone(),
         data_root_setting: data::config_str(app, ROOT_KEY).unwrap_or_default(),
@@ -224,6 +256,22 @@ pub fn settings_set(app: AppHandle, key: String, value: serde_json::Value) -> Re
         CATALOGUE_AUTO_KEY => {
             let on = value.as_bool().ok_or("catalogue_auto must be true or false")?;
             doc[CATALOGUE_AUTO_KEY] = toml_edit::value(on);
+        }
+        SYNC_URL_KEY => {
+            // Empty turns sync off. A trailing slash is dropped so the
+            // path sync appends never doubles it.
+            let url = value.as_str().unwrap_or("").trim().trim_end_matches('/').to_string();
+            if !url.is_empty() && !crate::sync::url_ok(&url) {
+                return Err("The server address must start with https:// and have no spaces".to_string());
+            }
+            doc[SYNC_URL_KEY] = toml_edit::value(url);
+        }
+        SYNC_TOKEN_KEY => {
+            let token = value.as_str().unwrap_or("").trim().to_string();
+            if token.len() > 256 || token.chars().any(|c| c.is_whitespace() || c.is_control()) {
+                return Err("The token must be one word of at most 256 characters".to_string());
+            }
+            doc[SYNC_TOKEN_KEY] = toml_edit::value(token);
         }
         IDLE_SECONDS_KEY => {
             let secs = value.as_i64().ok_or("idle_seconds must be a whole number")?;

@@ -30,6 +30,7 @@ import { initHotkeys } from './hotkeys.js';
 import { initQueuePanel } from './queue-panel.js';
 import { initLabPanel } from './lab-panel.js';
 import { initTray } from './tray.js';
+import { initSync } from './sync.js';
 import { invoke, inTauri } from './tauri.js';
 
 window.__nine_player = player;
@@ -215,6 +216,13 @@ window.__nine_panels = {
 /* The strip of covers over the bar, and its button for the Up next
    sheet above. See js/tray.js. */
 window.__nine_tray = initTray({ player });
+
+/* ---------- Sync ----------
+   Playlists and history, kept level with the phone through the owner's
+   own server. Off until Settings holds an address and a token; then it
+   runs here, in the one document that stays open, and the pages reach
+   it as window.parent.__nine_sync. See js/sync.js. */
+window.__nine_sync = initSync({ frame, toast: (text, bad) => window.__nine_toast(text, bad) });
 
 /* ---------- New release ----------
    update.rs does the checking, downloading and installing through
@@ -444,7 +452,7 @@ if (inTauri) {
 
 const SHELL_FILES = new Set([
   'shell.html', 'js/shell.js', 'js/player.js', 'js/ambient.js', 'js/hotkeys.js', 'js/lyrics.js',
-  'js/fx.js', 'js/popover.js', 'js/queue-panel.js', 'js/lab-panel.js', 'js/tray.js',
+  'js/fx.js', 'js/popover.js', 'js/queue-panel.js', 'js/lab-panel.js', 'js/tray.js', 'js/sync.js',
   // player.js imports, any of which changes the player's behaviour
   'js/config.js', 'js/tauri.js', 'js/utils.js', 'js/covers.js', 'js/ui.js', 'js/db.js',
   'js/picker.js'

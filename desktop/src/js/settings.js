@@ -24,10 +24,12 @@
 
 import { invoke, inTauri } from './tauri.js';
 import { initPlayer, applySettings } from './player.js';
+import { clearHistory } from './db.js';
 
 const el = {};
 ['discord', 'discordWord', 'updates', 'updatesWord', 'lyrics', 'lyricsWord', 'versionLine', 'checkUpdates',
   'idle', 'idleWord', 'idleSeconds', 'crossfade',
+  'syncUrl', 'syncToken', 'syncSave', 'syncNow', 'syncStop', 'syncStatus', 'clearHistory',
   'catCheck', 'catResult', 'catSum', 'catList', 'catMore', 'catApply', 'catClose', 'catAuto', 'catAutoWord',
   'rootPath', 'rootFound', 'rootBy', 'pickRoot', 'clearRoot',
   'restartNote', 'cfgPath', 'status', 'summary']
@@ -46,6 +48,8 @@ const DEFAULTS = {
   idle_seconds: 30,
   crossfade: 0,
   catalogue_auto: true,
+  sync_url: '',
+  sync_token_set: false,
   version: '',
   data_root: { path: '', source: 'not found', exists: false, catalogue: false, covers: false, audio: false, audio_index: false },
   data_root_setting: '',
@@ -130,6 +134,14 @@ function draw(s) {
   const auto = s.catalogue_auto !== false;
   el.catAuto.checked = auto;
   el.catAutoWord.textContent = auto ? el.catAutoWord.dataset.on : el.catAutoWord.dataset.off;
+
+  // Sync: the address is shown, the token never is. Only whether one is saved.
+  const url = s.sync_url || '';
+  if (document.activeElement !== el.syncUrl) el.syncUrl.value = url;
+  el.syncToken.placeholder = s.sync_token_set ? 'Saved. Paste a new one to replace it' : 'Paste the token';
+  const syncSet = Boolean(url) && Boolean(s.sync_token_set);
+  el.syncNow.disabled = !syncSet;
+  el.syncStop.disabled = !url && !s.sync_token_set;
 
   const root = s.data_root;
   ['catalogue', 'covers', 'audio'].forEach((k) => { held(k).dataset.on = String(Boolean(root[k])); });
@@ -277,7 +289,92 @@ async function applyList() {
   }
 }
 
+/* ---------- Sync ----------
+   The sync itself runs in the shell (js/sync.js). This card saves the
+   address and the token, asks the shell to sync, and shows what it
+   says. The token goes to Rust and is never read back. */
+
+function syncHost() {
+  try { return window.parent !== window ? window.parent.__nine_sync || null : null; } catch { return null; }
+}
+
+function drawSync(s) {
+  const bits = [s.message];
+  if (s.state === 'idle') {
+    const when = s.at ? new Date(s.at).toLocaleTimeString() : '';
+    bits[0] = `Synced${when ? ` at ${when}` : ''}`;
+    bits.push(`sent ${num(s.pushed)}, received ${num(s.pulled)}`);
+    if (s.rejected) bits.push(`${num(s.rejected)} of yours replaced by the newer version`);
+  }
+  el.syncStatus.textContent = bits.join('. ');
+  el.syncStatus.dataset.state = s.state === 'error' ? 'error' : '';
+  el.syncNow.disabled = s.state === 'running' || s.state === 'off';
+}
+
+async function saveSync() {
+  const url = el.syncUrl.value.trim();
+  const token = el.syncToken.value.trim();
+  el.syncSave.disabled = true;
+  try {
+    if (!(await set('sync_url', url))) return;
+    if (token && !(await set('sync_token', token))) return;
+    el.syncToken.value = '';
+    const host = syncHost();
+    if (host) await host.refresh();
+  } finally {
+    el.syncSave.disabled = false;
+  }
+}
+
+async function syncNow() {
+  const host = syncHost();
+  if (!host) { say('Sync is run by the app window, not this page', true); return; }
+  el.syncNow.disabled = true;
+  try { await host.now(); } finally { drawSync(host.status()); }
+}
+
+async function stopSync() {
+  const host = syncHost();
+  if (!host) { say('Sync is run by the app window, not this page', true); return; }
+  el.syncStop.disabled = true;
+  try {
+    await host.stop();
+    el.syncToken.value = '';
+    draw(await invoke('settings_get'));
+    say('Sync is off');
+  } catch (err) {
+    say(`Could not stop sync: ${err}`, true);
+  }
+}
+
+let clearArmed = null;
+async function clearPlays() {
+  if (!clearArmed) {
+    // Two presses, because it cannot be taken back.
+    el.clearHistory.textContent = 'Press again to clear';
+    clearArmed = setTimeout(() => {
+      clearArmed = null;
+      el.clearHistory.textContent = 'Clear history';
+    }, 4000);
+    return;
+  }
+  clearTimeout(clearArmed);
+  clearArmed = null;
+  el.clearHistory.textContent = 'Clear history';
+  try {
+    const n = await clearHistory();
+    say(n ? `Listening history cleared (${num(n)} plays)` : 'There was no history to clear');
+  } catch (err) {
+    say(`Not cleared: ${err}`, true);
+  }
+}
+
 function wire() {
+  el.syncSave.addEventListener('click', saveSync);
+  el.syncNow.addEventListener('click', syncNow);
+  el.syncStop.addEventListener('click', stopSync);
+  el.clearHistory.addEventListener('click', clearPlays);
+
   el.catCheck.addEventListener('click', checkList);
   el.catApply.addEventListener('click', applyList);
   el.catClose.addEventListener('click', () => { el.catResult.hidden = true; });
@@ -340,6 +437,16 @@ async function boot() {
     // An app built before the settings existed: the page shows the
     // defaults and can be looked at, but nothing here can be saved.
     say(`This build of the app cannot save settings (${err}). Rebuild or reinstall it.`, true);
+  }
+
+  // The sync line follows the shell's, and is re-read now so a first
+  // sync that is waiting says so.
+  const host = syncHost();
+  if (host) {
+    drawSync(host.status());
+    const stop = host.subscribe(drawSync);
+    window.addEventListener('pagehide', stop, { once: true });
+    host.refresh();
   }
 
   // The shell found changes on its own and put a dot on this tab: show
