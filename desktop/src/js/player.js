@@ -402,6 +402,7 @@ function tick() {
   const step = pos - lastPos;
   if (step > 0 && step < 2) unflushed += step;
   lastPos = pos;
+  if (!playId && unflushed >= COUNT_AFTER) logStart();
 }
 
 /** Write the seconds heard so far. Called on a timer while playing
@@ -415,14 +416,21 @@ function flushListened() {
   });
 }
 
-/** A track has started making sound for the first time since it was
-    loaded: give it a row. Seconds ticked while the row was in flight
-    wait in `unflushed` and land on the next flush. */
+/** Seconds of listening before a track counts as a play. */
+const COUNT_AFTER = 30;
+/** When the loaded track first made sound, kept as the play's time. */
+let startedAt = 0;
+
+/** The track has been heard long enough: give it a row. The seconds
+    heard so far go in with it, and `unflushed` starts again from zero. */
 function logStart() {
-  if (playId || logging || !state.track) return;
+  const track = state.track;
+  if (playId || logging || !track) return;
   logging = true;
-  logPlay(state.track)
-    .then((id) => { playId = id; })
+  const sec = unflushed;
+  unflushed = 0;
+  logPlay(track, { start: startedAt, sec })
+    .then((id) => { if (state.track === track) playId = id; })
     .catch(() => {})
     .finally(() => { logging = false; });
 }
@@ -1626,6 +1634,7 @@ async function load(track, { autoplay = true, at = 0, resumeId = null } = {}) {
   }
   playId = resumeId || null;
   logging = false;
+  startedAt = 0;
   lastPos = at > 0 ? at : 0;
   unflushed = 0;
 
@@ -2493,7 +2502,7 @@ function bindElement(el) {
   el.addEventListener('play', () => {
     if (el !== audio) return;
     lastPos = audio.currentTime || 0;
-    logStart();
+    if (!startedAt) startedAt = Date.now();
     lab.fx.resume();
     paintPlaying(true);
     saveResume();
@@ -2555,6 +2564,9 @@ function bindElement(el) {
   el.addEventListener('ended', () => {
     if (el !== audio) return;
     tick();
+    // A song shorter than the threshold counts once most of it was heard
+    const dur = audio.duration;
+    if (!playId && Number.isFinite(dur) && dur > 0 && unflushed >= dur * 0.5) logStart();
     flushListened();
 
     // "Stop after this song": it ends here, whatever was due next

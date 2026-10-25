@@ -565,8 +565,11 @@ export function clearRecent() {
  * A snapshot of the track rides along, the same fields a playlist row
  * keeps, so the overview can draw a most-played list with covers
  * without reading the catalogue.
+ *
+ * `start` is when the track began (the player logs a play only once it
+ * has been heard for a while) and `sec` is what was heard by then.
  */
-export function logPlay(track) {
+export function logPlay(track, { start = 0, sec = 0 } = {}) {
   if (!track) return Promise.resolve(null);
 
   const row = {
@@ -575,8 +578,8 @@ export function logPlay(track) {
     t: track.t || '',
     c: track.c || 'main',
     cov: track.cov || null,
-    at: stamp(),
-    sec: 0,
+    at: start > 0 ? start : stamp(),
+    sec: sec > 0 ? sec : 0,
     dirty: mark()
   };
 
